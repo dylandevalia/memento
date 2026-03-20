@@ -1,0 +1,34 @@
+{
+  "name": "bun-react-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n ui,api -c cyan,yellow \"vite\" \"bun --hot server/index.ts\"",
+    "dev:ui": "vite",
+    "dev:api": "bun --hot server/index.ts",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "NODE_ENV=production bun server/index.ts",
+    "lint": "biome lint --write .",
+    "format": "biome format --write .",
+    "check": "biome check --write ."
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.9",
+    "@mui/material": "^7.3.9",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
+    "@types/bun": "latest",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "vite": "^8.0.1"
+  }
+}
