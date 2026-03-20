@@ -1,6 +1,5 @@
 import { serve } from "bun";
 import path from "path";
-import { helloRoutes } from "./routes/hello";
 
 const isDev = process.env.NODE_ENV !== "production";
 const port = isDev ? 3001 : 3000;
@@ -8,9 +7,7 @@ const distDir = path.join(import.meta.dir, "../dist");
 
 const server = serve({
   port,
-  routes: {
-    ...helloRoutes,
-  },
+  routes: {},
 
   // In production, serve Vite's built output and fall back to index.html for SPA routing.
   async fetch(req) {

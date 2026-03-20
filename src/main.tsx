@@ -1,8 +1,6 @@
 /**
- * This file is the entry point for the React app, it sets up the root
- * element and renders the App component to the DOM.
- *
- * It is included in `index.html`.
+ * Entry point for the React app.
+ * Renders the App component into the #root element.
  */
 
 import { StrictMode } from "react";
