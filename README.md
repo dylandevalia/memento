@@ -71,6 +71,68 @@ bun start       # serve everything from a single process on port 3000
 
 The production server serves the built frontend as static files and handles all `/api` routes.
 
+## Docker
+
+A pre-built image is published to Docker Hub automatically on every push to `main`:
+
+```
+dylandevalia/memento:latest
+```
+
+### Deploy on a server / droplet
+
+Only `docker-compose.yml` is needed on the server — no source code or Dockerfile required. The image is pulled from Docker Hub automatically.
+
+```bash
+# First deploy
+mkdir -p ~/memento && cd ~/memento
+curl -fsSL https://raw.githubusercontent.com/dylandevalia/memento/main/docker-compose.yml -o docker-compose.yml
+docker compose pull
+docker compose up -d
+
+# Update to the latest image after a new release
+docker compose pull && docker compose up -d
+```
+
+The app is served on port `3000`. Put Nginx or Caddy in front for HTTPS:
+
+```
+# Caddyfile
+your-domain.com {
+    reverse_proxy localhost:3000
+}
+```
+
+### Data persistence
+
+SQLite (`data.db`) and all configuration are stored in a named Docker volume (`memento-data`) mounted at `/data` inside the container. It survives image rebuilds and container restarts automatically.
+
+To back up the database:
+
+```bash
+docker run --rm \
+  -v memento-data:/data \
+  -v $(pwd):/out \
+  busybox cp /data/data.db /out/data.db.bak
+```
+
+### Build and push locally
+
+```bash
+docker login
+docker compose build
+docker compose push
+```
+
+### CI — GitHub Actions
+
+The workflow at [.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml) builds and pushes the image automatically on every push to `main`. Add these two secrets to your GitHub repository (Settings → Secrets & variables → Actions):
+
+| Secret               | Value                                                                   |
+| -------------------- | ----------------------------------------------------------------------- |
+| `DOCKERHUB_USERNAME` | `dylandevalia`                                                          |
+| `DOCKERHUB_TOKEN`    | A Docker Hub access token (Account Settings → Security → Access Tokens) |
+
 ## Project Structure
 
 ```
@@ -100,9 +162,11 @@ src/
 
 ## Scripts
 
-| Command         | Description                   |
-| --------------- | ----------------------------- |
-| `bun dev`       | Start dev servers (UI + API)  |
-| `bun run build` | Build frontend for production |
-| `bun start`     | Run production server         |
-| `bun run check` | Biome lint + format           |
+| Command                                       | Description                    |
+| --------------------------------------------- | ------------------------------ |
+| `bun dev`                                     | Start dev servers (UI + API)   |
+| `bun run build`                               | Build frontend for production  |
+| `bun start`                                   | Run production server          |
+| `bun run check`                               | Biome lint + format            |
+| `docker compose up -d --build`                | Build image locally and start  |
+| `docker compose pull && docker compose up -d` | Pull latest image and redeploy |

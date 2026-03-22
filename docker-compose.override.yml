@@ -1,0 +1,6 @@
+# Automatically merged by Docker Compose during local development.
+# Adds the build context so `docker compose up --build` works locally.
+# This file is NOT needed on the droplet.
+services:
+  app:
+    build: .
