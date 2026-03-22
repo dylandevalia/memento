@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Container,
   TextField,
   Typography,
 } from "@mui/material";
@@ -72,12 +71,15 @@ export default function LoginPage() {
   if (hasPassword === null) {
     return (
       <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
+        sx={{
+          minHeight: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: "background.default",
+        }}
       >
-        <CircularProgress />
+        <CircularProgress size={24} thickness={2} />
       </Box>
     );
   }
@@ -85,87 +87,116 @@ export default function LoginPage() {
   const isSetup = !hasPassword;
 
   return (
-    <Container maxWidth="xs">
-      <Box
-        display="flex"
-        flexDirection="column"
-        alignItems="center"
-        justifyContent="center"
-        minHeight="100vh"
-        gap={2}
+    <Box
+      sx={{
+        minHeight: "100dvh",
+        bgcolor: "background.default",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        px: 3,
+      }}
+    >
+      {/* Wordmark */}
+      <Typography
+        sx={{
+          letterSpacing: "0.35em",
+          color: "primary.main",
+          fontSize: "0.68rem",
+          textTransform: "uppercase",
+          mb: 5,
+        }}
       >
-        <Box
-          sx={{
-            bgcolor: "primary.main",
-            borderRadius: "50%",
-            p: 1.5,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <LockOutlinedIcon sx={{ color: "white", fontSize: 28 }} />
-        </Box>
+        Memento
+      </Typography>
 
-        <Typography variant="h5" fontWeight={600}>
-          {isSetup ? "Set Admin Password" : "Admin Login"}
+      {/* Lock icon */}
+      <Box
+        sx={{
+          width: 56,
+          height: 56,
+          borderRadius: "50%",
+          border: "1.5px solid",
+          borderColor: "rgba(200, 169, 110, 0.35)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          mb: 3,
+        }}
+      >
+        <LockOutlinedIcon
+          sx={{ fontSize: 22, color: "primary.main", opacity: 0.8 }}
+        />
+      </Box>
+
+      <Typography variant="h5" sx={{ mb: 0.75 }}>
+        {isSetup ? "Set Admin Password" : "Admin Portal"}
+      </Typography>
+
+      {isSetup && (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ textAlign: "center", maxWidth: 280, mb: 1, lineHeight: 1.7 }}
+        >
+          Create a password to protect the admin portal.
         </Typography>
+      )}
+
+      {/* Form */}
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        sx={{
+          width: "100%",
+          maxWidth: 360,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          mt: 3,
+        }}
+      >
+        <TextField
+          label="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          fullWidth
+          autoFocus
+          autoComplete={isSetup ? "new-password" : "current-password"}
+        />
 
         {isSetup && (
-          <Typography variant="body2" color="text.secondary" textAlign="center">
-            No password has been set yet. Create one to protect the admin
-            portal.
-          </Typography>
+          <TextField
+            label="Confirm Password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            fullWidth
+            autoComplete="new-password"
+          />
         )}
 
-        <Box
-          component="form"
-          onSubmit={handleSubmit}
-          width="100%"
-          display="flex"
-          flexDirection="column"
-          gap={2}
+        {error && <Alert severity="error">{error}</Alert>}
+
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          fullWidth
+          disabled={loading}
+          sx={{ mt: 0.5 }}
         >
-          <TextField
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            fullWidth
-            autoFocus
-            autoComplete={isSetup ? "new-password" : "current-password"}
-          />
-
-          {isSetup && (
-            <TextField
-              label="Confirm Password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              fullWidth
-              autoComplete="new-password"
-            />
+          {loading ? (
+            <CircularProgress size={20} color="inherit" />
+          ) : isSetup ? (
+            "Set Password"
+          ) : (
+            "Sign In"
           )}
-
-          {error && <Alert severity="error">{error}</Alert>}
-
-          <Button
-            type="submit"
-            variant="contained"
-            size="large"
-            fullWidth
-            disabled={loading}
-          >
-            {loading ? (
-              <CircularProgress size={22} color="inherit" />
-            ) : isSetup ? (
-              "Set Password"
-            ) : (
-              "Login"
-            )}
-          </Button>
-        </Box>
+        </Button>
       </Box>
-    </Container>
+    </Box>
   );
 }

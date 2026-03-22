@@ -14,12 +14,26 @@ export const thumbnailRoutes = {
         if (!url) {
           return new Response("No thumbnail available", { status: 404 });
         }
-        // Tell browsers to cache the redirect for 1 hour
-        return new Response(null, {
-          status: 302,
+
+        // Proxy the image bytes through our server so browsers never hit
+        // Google's CDN directly — this prevents per-IP 429s from the client side.
+        const upstream = await fetch(url);
+        if (!upstream.ok) {
+          return new Response("Upstream fetch failed", {
+            status: upstream.status,
+          });
+        }
+
+        const contentType =
+          upstream.headers.get("content-type") ?? "image/jpeg";
+        const body = await upstream.arrayBuffer();
+
+        return new Response(body, {
+          status: 200,
           headers: {
-            Location: url,
-            "Cache-Control": "public, max-age=3600",
+            "Content-Type": contentType,
+            // Clients cache for 24 h; CDN/proxy may cache for the same period
+            "Cache-Control": "public, max-age=86400, immutable",
           },
         });
       } catch (err) {

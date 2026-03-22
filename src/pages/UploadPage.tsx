@@ -1,20 +1,20 @@
+import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import QrCode2Icon from "@mui/icons-material/QrCode2";
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
-  Container,
+  Dialog,
+  DialogContent,
   Divider,
   IconButton,
-  ImageList,
-  ImageListItem,
-  ImageListItemBar,
   LinearProgress,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,7 +31,7 @@ interface UploadRecord {
 }
 
 function storageKey(slug: string) {
-  return `photo-uploader:uploads:${slug}`;
+  return `memento:uploads:${slug}`;
 }
 
 function loadHistory(slug: string): UploadRecord[] {
@@ -51,6 +51,135 @@ function saveHistory(slug: string, records: UploadRecord[]) {
   }
 }
 
+function UploadHistory({
+  history,
+  deletingIds,
+  onDelete,
+}: {
+  history: UploadRecord[];
+  deletingIds: Set<string>;
+  onDelete: (driveId: string) => void;
+}) {
+  if (history.length === 0) return null;
+
+  return (
+    <Box sx={{ px: 2, pb: 6 }}>
+      {/* Ornamental divider */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          my: 4,
+        }}
+      >
+        <Box
+          sx={{
+            flex: 1,
+            height: "1px",
+            bgcolor: "divider",
+          }}
+        />
+        <Typography
+          sx={{
+            fontSize: "0.6rem",
+            letterSpacing: "0.22em",
+            textTransform: "uppercase",
+            color: "text.secondary",
+            opacity: 0.55,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Your contributions
+        </Typography>
+        <Box
+          sx={{
+            flex: 1,
+            height: "1px",
+            bgcolor: "divider",
+          }}
+        />
+      </Box>
+
+      {/* History grid */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "3px",
+          borderRadius: 2,
+          overflow: "hidden",
+        }}
+      >
+        {history.map((r) => (
+          <Box
+            key={`${r.driveId}-${r.uploadedAt}`}
+            sx={{
+              aspectRatio: "1",
+              position: "relative",
+              overflow: "hidden",
+              bgcolor: "rgba(255,255,255,0.04)",
+            }}
+          >
+            <img
+              src={`/api/thumbnail/${r.driveId}`}
+              alt={r.name}
+              loading="lazy"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+            {/* Gradient for button contrast */}
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                background:
+                  "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 45%)",
+                pointerEvents: "none",
+              }}
+            />
+            <IconButton
+              size="small"
+              onClick={() => onDelete(r.driveId)}
+              disabled={deletingIds.has(r.driveId)}
+              aria-label={`Delete ${r.name}`}
+              sx={{
+                position: "absolute",
+                bottom: 5,
+                right: 5,
+                width: 28,
+                height: 28,
+                bgcolor: "rgba(0,0,0,0.48)",
+                backdropFilter: "blur(6px)",
+                color: "rgba(255,255,255,0.75)",
+                borderRadius: "50%",
+                "&:hover": { bgcolor: "rgba(0,0,0,0.68)" },
+                "&.Mui-disabled": {
+                  bgcolor: "rgba(0,0,0,0.3)",
+                  color: "rgba(255,255,255,0.3)",
+                },
+              }}
+            >
+              {deletingIds.has(r.driveId) ? (
+                <CircularProgress size={12} color="inherit" />
+              ) : (
+                <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+              )}
+            </IconButton>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
 export default function UploadPage() {
   const { slug } = useParams<{ slug: string }>();
   const [status, setStatus] = useState<Status>("validating");
@@ -61,6 +190,13 @@ export default function UploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadHistory, setUploadHistory] = useState<UploadRecord[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrData, setQrData] = useState<{
+    qrCodeDataUrl: string;
+    uploadUrl: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Create object URLs for thumbnails and revoke them when the file list changes
@@ -115,6 +251,45 @@ export default function UploadPage() {
     [addFiles],
   );
 
+  const handleDelete = useCallback(
+    async (driveId: string) => {
+      if (!slug) return;
+      setDeletingIds((prev) => new Set(prev).add(driveId));
+      try {
+        await api.upload.deleteFile(slug, driveId);
+        setUploadHistory((prev) => {
+          const updated = prev.filter((r) => r.driveId !== driveId);
+          saveHistory(slug, updated);
+          return updated;
+        });
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setDeletingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(driveId);
+          return next;
+        });
+      }
+    },
+    [slug],
+  );
+
+  const handleOpenQr = useCallback(async () => {
+    if (!slug) return;
+    setQrOpen(true);
+    if (qrData) return; // already fetched
+    setQrLoading(true);
+    try {
+      const data = await api.events.qr(slug);
+      setQrData(data);
+    } catch {
+      // silently ignore — dialog will show nothing
+    } finally {
+      setQrLoading(false);
+    }
+  }, [slug, qrData]);
+
   const handleUpload = useCallback(async () => {
     if (!slug || selectedFiles.length === 0) return;
     setStatus("uploading");
@@ -140,67 +315,360 @@ export default function UploadPage() {
   }, [slug, selectedFiles]);
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
+    <Box
+      sx={{
+        minHeight: "100dvh",
+        bgcolor: "background.default",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* ── Validating ─────────────────────────────────── */}
       {status === "validating" && (
-        <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
-          <CircularProgress />
-          <Typography>Validating link…</Typography>
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 3,
+          }}
+        >
+          <Typography
+            sx={{
+              letterSpacing: "0.35em",
+              color: "primary.main",
+              fontSize: "0.68rem",
+              textTransform: "uppercase",
+            }}
+          >
+            Memento
+          </Typography>
+          <CircularProgress size={24} thickness={2} />
         </Box>
       )}
 
+      {/* ── Invalid ────────────────────────────────────── */}
       {status === "invalid" && (
-        <Alert severity="error" sx={{ mt: 2 }}>
-          {error ?? "This link is invalid or has expired."}
-        </Alert>
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            px: 5,
+            gap: 2,
+          }}
+        >
+          <Typography
+            sx={{
+              letterSpacing: "0.35em",
+              color: "primary.main",
+              fontSize: "0.68rem",
+              textTransform: "uppercase",
+              mb: 1,
+            }}
+          >
+            Memento
+          </Typography>
+          <Typography variant="h5">Link Unavailable</Typography>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ maxWidth: 280 }}
+          >
+            {error ?? "This link is invalid or has expired."}
+          </Typography>
+        </Box>
       )}
 
+      {/* ── Ready / Uploading ──────────────────────────── */}
       {(status === "ready" || status === "uploading") && (
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h4" fontWeight={700}>
-              Upload Photos
+        <>
+          {/* Header */}
+          <Box
+            sx={{
+              px: 3,
+              pt: 5,
+              pb: 3,
+              textAlign: "center",
+              position: "relative",
+            }}
+          >
+            {/* QR share button */}
+            <Tooltip title="Share QR code">
+              <IconButton
+                size="small"
+                onClick={handleOpenQr}
+                sx={{
+                  position: "absolute",
+                  top: 16,
+                  right: 8,
+                  color: "text.secondary",
+                  "&:hover": { color: "primary.main" },
+                }}
+              >
+                <QrCode2Icon sx={{ fontSize: 22 }} />
+              </IconButton>
+            </Tooltip>
+            <Typography
+              sx={{
+                letterSpacing: "0.35em",
+                color: "primary.main",
+                fontSize: "0.65rem",
+                textTransform: "uppercase",
+                display: "block",
+                mb: 2.5,
+              }}
+            >
+              Memento
             </Typography>
             {eventInfo && (
-              <Typography color="text.secondary">
-                {eventInfo.name}
-                {eventInfo.expiresAt
-                  ? ` · Expires ${new Date(eventInfo.expiresAt).toLocaleString()}`
-                  : ""}
-              </Typography>
+              <>
+                <Typography variant="h4" sx={{ lineHeight: 1.25, mb: 0.75 }}>
+                  {eventInfo.name}
+                </Typography>
+                {eventInfo.expiresAt && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ letterSpacing: "0.04em" }}
+                  >
+                    Link expires{" "}
+                    {new Date(eventInfo.expiresAt).toLocaleDateString(
+                      undefined,
+                      { month: "long", day: "numeric" },
+                    )}
+                  </Typography>
+                )}
+              </>
             )}
           </Box>
 
-          {/* Drop zone */}
-          <Card
-            variant="outlined"
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            sx={{
-              border: "2px dashed",
-              borderColor: isDragging ? "primary.main" : "divider",
-              backgroundColor: isDragging ? "action.hover" : "background.paper",
-              cursor: "pointer",
-              transition: "all 0.2s",
-            }}
-          >
-            <CardContent>
-              <Stack alignItems="center" spacing={1} py={3}>
-                <CloudUploadIcon sx={{ fontSize: 48 }} color="action" />
-                <Typography variant="body1">
-                  Drag & drop files here, or click to select
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Photos and videos only
-                </Typography>
-              </Stack>
-            </CardContent>
-          </Card>
+          {/* Content */}
+          <Box sx={{ flex: 1, px: 2, pb: 2 }}>
+            {/* Drop zone — hidden once files are selected */}
+            {selectedFiles.length === 0 && (
+              <Box
+                role="button"
+                tabIndex={0}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && fileInputRef.current?.click()
+                }
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                sx={{
+                  border: "1px dashed",
+                  borderColor: isDragging
+                    ? "primary.main"
+                    : "rgba(200, 169, 110, 0.22)",
+                  borderRadius: 3,
+                  py: 8,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2.5,
+                  cursor: "pointer",
+                  transition:
+                    "border-color 0.25s, background-color 0.25s, box-shadow 0.25s",
+                  bgcolor: isDragging
+                    ? "rgba(200, 169, 110, 0.05)"
+                    : "transparent",
+                  boxShadow: isDragging
+                    ? "0 0 40px rgba(200, 169, 110, 0.07)"
+                    : "none",
+                  outline: "none",
+                  "&:focus-visible": {
+                    borderColor: "primary.main",
+                    boxShadow: "0 0 0 2px rgba(200, 169, 110, 0.3)",
+                  },
+                }}
+              >
+                <PhotoCameraOutlinedIcon
+                  sx={{
+                    fontSize: 44,
+                    color: "primary.main",
+                    opacity: isDragging ? 1 : 0.65,
+                    transition: "opacity 0.25s",
+                  }}
+                />
+                <Box sx={{ textAlign: "center" }}>
+                  <Typography
+                    variant="body1"
+                    sx={{ color: "text.primary", fontWeight: 400, mb: 0.5 }}
+                  >
+                    Share your memories
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Tap to add photos &amp; videos
+                  </Typography>
+                </Box>
+              </Box>
+            )}
 
+            {/* Selected files grid */}
+            {selectedFiles.length > 0 && (
+              <Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    mb: 1.5,
+                    px: 0.25,
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: "0.68rem",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: "text.secondary",
+                    }}
+                  >
+                    {selectedFiles.length}{" "}
+                    {selectedFiles.length === 1 ? "memory" : "memories"} ready
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => fileInputRef.current?.click()}
+                    sx={{
+                      fontSize: "0.72rem",
+                      letterSpacing: "0.06em",
+                      px: 1.5,
+                      py: 0.4,
+                      minHeight: "auto",
+                    }}
+                  >
+                    Add more
+                  </Button>
+                </Box>
+
+                {/* 3-column photo grid */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: "3px",
+                    borderRadius: 2,
+                    overflow: "hidden",
+                  }}
+                >
+                  {selectedFiles.map((f, i) => (
+                    <Box
+                      key={f.name}
+                      sx={{
+                        aspectRatio: "1",
+                        position: "relative",
+                        overflow: "hidden",
+                        bgcolor: "rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      {f.type.startsWith("video/") ? (
+                        <video
+                          src={previewUrls[i]}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                          preload="metadata"
+                        >
+                          <track kind="captions" />
+                        </video>
+                      ) : (
+                        <img
+                          src={previewUrls[i]}
+                          alt={f.name}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+                      )}
+                      {/* Top gradient for icon visibility */}
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          background:
+                            "linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 45%)",
+                          pointerEvents: "none",
+                        }}
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          setSelectedFiles((prev) =>
+                            prev.filter((x) => x.name !== f.name),
+                          )
+                        }
+                        sx={{
+                          position: "absolute",
+                          top: 5,
+                          right: 5,
+                          width: 26,
+                          height: 26,
+                          bgcolor: "rgba(0,0,0,0.50)",
+                          backdropFilter: "blur(6px)",
+                          color: "rgba(255,255,255,0.85)",
+                          borderRadius: "50%",
+                          "&:hover": { bgcolor: "rgba(0,0,0,0.70)" },
+                        }}
+                      >
+                        <CloseIcon sx={{ fontSize: 13 }} />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* Errors & progress */}
+            {error && (
+              <Alert severity="error" sx={{ mt: 2.5 }}>
+                {error}
+              </Alert>
+            )}
+            {status === "uploading" && (
+              <LinearProgress sx={{ mt: 2.5, mx: 0.25 }} />
+            )}
+
+            {/* Upload CTA */}
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              disabled={selectedFiles.length === 0 || status === "uploading"}
+              onClick={handleUpload}
+              sx={{ mt: 3 }}
+              startIcon={
+                status === "uploading" ? (
+                  <CircularProgress size={17} color="inherit" />
+                ) : undefined
+              }
+            >
+              {status === "uploading"
+                ? "Sharing…"
+                : selectedFiles.length === 0
+                  ? "Select Photos & Videos"
+                  : `Share ${selectedFiles.length} ${selectedFiles.length === 1 ? "Memory" : "Memories"}`}
+            </Button>
+          </Box>
+
+          {/* Hidden file input */}
           <input
             ref={fileInputRef}
             type="file"
@@ -210,143 +678,159 @@ export default function UploadPage() {
             onChange={(e) => e.target.files && addFiles(e.target.files)}
           />
 
-          {selectedFiles.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                {selectedFiles.length} file
-                {selectedFiles.length !== 1 ? "s" : ""} selected
-              </Typography>
-              <ImageList cols={3} rowHeight={140} gap={6}>
-                {selectedFiles.map((f, i) => (
-                  <ImageListItem
-                    key={f.name}
-                    sx={{ borderRadius: 1, overflow: "hidden" }}
-                  >
-                    {f.type.startsWith("video/") ? (
-                      <video
-                        src={previewUrls[i]}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          display: "block",
-                        }}
-                        preload="metadata"
-                      >
-                        <track kind="captions" />
-                      </video>
-                    ) : (
-                      <img
-                        src={previewUrls[i]}
-                        alt={f.name}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          display: "block",
-                        }}
-                      />
-                    )}
-                    <ImageListItemBar
-                      title={f.name}
-                      subtitle={`${(f.size / 1024 / 1024).toFixed(2)} MB`}
-                      actionIcon={
-                        <IconButton
-                          size="small"
-                          sx={{ color: "white" }}
-                          onClick={() =>
-                            setSelectedFiles((prev) =>
-                              prev.filter((x) => x.name !== f.name),
-                            )
-                          }
-                        >
-                          <CloseIcon fontSize="small" />
-                        </IconButton>
-                      }
-                    />
-                  </ImageListItem>
-                ))}
-              </ImageList>
+          {/* Upload history */}
+          <UploadHistory
+            history={uploadHistory}
+            deletingIds={deletingIds}
+            onDelete={handleDelete}
+          />
+        </>
+      )}
+
+      {/* ── Done ───────────────────────────────────────── */}
+      {status === "done" && (
+        <>
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+              px: 5,
+              gap: 2,
+              py: 8,
+            }}
+          >
+            {/* Gold check circle */}
+            <Box
+              sx={{
+                width: 72,
+                height: 72,
+                borderRadius: "50%",
+                border: "1.5px solid",
+                borderColor: "primary.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 1,
+              }}
+            >
+              <CheckIcon sx={{ fontSize: 34, color: "primary.main" }} />
+            </Box>
+
+            <Typography variant="h5">Beautifully shared</Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ maxWidth: 260, lineHeight: 1.7 }}
+            >
+              Your memories are now part of the celebration.
+            </Typography>
+            <Stack direction="row" spacing={1.5} sx={{ mt: 1 }}>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setError(null);
+                  setStatus("ready");
+                }}
+              >
+                Share More
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<QrCode2Icon />}
+                onClick={handleOpenQr}
+              >
+                QR Code
+              </Button>
+            </Stack>
+          </Box>
+
+          <UploadHistory
+            history={uploadHistory}
+            deletingIds={deletingIds}
+            onDelete={handleDelete}
+          />
+        </>
+      )}
+
+      {/* ── QR code dialog ─────────────────────────────── */}
+      <Dialog
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: "background.paper",
+            backgroundImage: "none",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 3,
+            mx: 2,
+          },
+        }}
+      >
+        <DialogContent sx={{ textAlign: "center", py: 4 }}>
+          {qrLoading && (
+            <Box sx={{ py: 6 }}>
+              <CircularProgress size={24} thickness={2} />
             </Box>
           )}
-
-          {error && <Alert severity="error">{error}</Alert>}
-
-          {status === "uploading" && <LinearProgress />}
-
-          <Button
-            variant="contained"
-            size="large"
-            disabled={selectedFiles.length === 0 || status === "uploading"}
-            onClick={handleUpload}
-            startIcon={
-              status === "uploading" ? (
-                <CircularProgress size={18} color="inherit" />
-              ) : undefined
-            }
-          >
-            {status === "uploading"
-              ? "Uploading…"
-              : `Upload ${selectedFiles.length || ""} File${selectedFiles.length !== 1 ? "s" : ""}`}
-          </Button>
-        </Stack>
-      )}
-
-      {status === "done" && (
-        <Stack spacing={3}>
-          <Alert severity="success">
-            {uploadHistory[0]
-              ? `Uploaded successfully on ${new Date(uploadHistory[0].uploadedAt).toLocaleString()}`
-              : "Uploaded successfully!"}
-          </Alert>
-          <Button variant="outlined" onClick={() => setStatus("ready")}>
-            Upload More
-          </Button>
-        </Stack>
-      )}
-
-      {/* Persistent upload history */}
-      {(status === "ready" || status === "uploading" || status === "done") &&
-        uploadHistory.length > 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Divider sx={{ mb: 2 }} />
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              Previously uploaded
-            </Typography>
-            <ImageList cols={3} rowHeight={140} gap={6}>
-              {uploadHistory.map((r) => (
-                <ImageListItem
-                  key={`${r.driveId}-${r.uploadedAt}`}
-                  sx={{
-                    borderRadius: 1,
-                    overflow: "hidden",
-                    bgcolor: "action.hover",
+          {!qrLoading && qrData && (
+            <Stack spacing={2.5} alignItems="center">
+              <Typography variant="h5">{eventInfo?.name ?? "Share"}</Typography>
+              <Box
+                sx={{
+                  p: 1.5,
+                  bgcolor: "#fff",
+                  borderRadius: 2,
+                  border: "1px solid",
+                  borderColor: "rgba(200, 169, 110, 0.2)",
+                }}
+              >
+                <Box
+                  component="img"
+                  src={qrData.qrCodeDataUrl}
+                  alt="QR code"
+                  sx={{ width: "100%", maxWidth: 220, display: "block" }}
+                />
+              </Box>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  fontFamily: "monospace",
+                  fontSize: "0.72rem",
+                  wordBreak: "break-all",
+                }}
+              >
+                {qrData.uploadUrl}
+              </Typography>
+              <Divider flexItem />
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    if (!qrData) return;
+                    const a = document.createElement("a");
+                    a.href = qrData.qrCodeDataUrl;
+                    a.download = `${eventInfo?.name ?? "event"}-qr.png`;
+                    a.click();
                   }}
                 >
-                  <img
-                    src={`/api/thumbnail/${r.driveId}`}
-                    alt={r.name}
-                    loading="lazy"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                    onError={(e) => {
-                      // Hide broken image icon if Drive has no thumbnail yet
-                      (e.currentTarget as HTMLImageElement).style.display =
-                        "none";
-                    }}
-                  />
-                  <ImageListItemBar
-                    subtitle={new Date(r.uploadedAt).toLocaleString()}
-                  />
-                </ImageListItem>
-              ))}
-            </ImageList>
-          </Box>
-        )}
-    </Container>
+                  Download
+                </Button>
+                <Button variant="contained" onClick={() => setQrOpen(false)}>
+                  Done
+                </Button>
+              </Stack>
+            </Stack>
+          )}
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 }

@@ -4,17 +4,31 @@
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: Roboto, system-ui, sans-serif;
-  line-height: 1.5;
+:root {
+  color-scheme: dark;
 }
 
-.app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background-color: #0d0d10;
+}
+
+body {
+  font-family: Roboto, system-ui, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent content shift when a page changes scroll length */
+  scrollbar-gutter: stable;
+}
+
+/* Prevent iOS text size adjustment */
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {

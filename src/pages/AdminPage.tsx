@@ -1,8 +1,9 @@
-import DeleteIcon from "@mui/icons-material/Delete";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import FolderIcon from "@mui/icons-material/Folder";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import GoogleIcon from "@mui/icons-material/Google";
-import LockIcon from "@mui/icons-material/Lock";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
@@ -10,12 +11,7 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  Chip,
   CircularProgress,
-  Container,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -23,10 +19,6 @@ import {
   IconButton,
   InputAdornment,
   Stack,
-  Step,
-  StepContent,
-  StepLabel,
-  Stepper,
   TextField,
   Tooltip,
   Typography,
@@ -42,6 +34,134 @@ import type {
   Event,
   GoogleCredentials,
 } from "../types";
+
+// ── Shared layout primitives ───────────────────────────────────────────────
+
+function Section({
+  title,
+  subtitle,
+  icon,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box sx={{ mb: 5 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          mb: subtitle ? 0.5 : 2.5,
+        }}
+      >
+        {icon}
+        <Typography variant="h5" sx={{ fontSize: "1.1rem" }}>
+          {title}
+        </Typography>
+      </Box>
+      {subtitle && (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mb: 2.5, lineHeight: 1.7 }}
+        >
+          {subtitle}
+        </Typography>
+      )}
+      <Box
+        sx={{
+          border: "1px solid",
+          borderColor: "rgba(200, 169, 110, 0.1)",
+          borderRadius: 2,
+          overflow: "hidden",
+          bgcolor: "background.paper",
+        }}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
+function SetupStep({
+  number,
+  title,
+  done,
+  doneAction,
+  children,
+}: {
+  number: number;
+  title: string;
+  done: boolean;
+  doneAction?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box sx={{ px: 2.5, py: 2.5 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 2,
+        }}
+      >
+        {/* Step number / check */}
+        <Box
+          sx={{
+            width: 26,
+            height: 26,
+            borderRadius: "50%",
+            border: "1.5px solid",
+            borderColor: done ? "success.main" : "rgba(200, 169, 110, 0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            mt: 0.1,
+            color: done ? "success.main" : "text.secondary",
+            transition: "all 0.2s",
+          }}
+        >
+          {done ? (
+            <CheckCircleOutlineIcon sx={{ fontSize: 14 }} />
+          ) : (
+            <Typography sx={{ fontSize: "0.7rem", lineHeight: 1 }}>
+              {number}
+            </Typography>
+          )}
+        </Box>
+        <Box sx={{ flex: 1 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              mb: done ? 0 : 1.5,
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: "0.88rem",
+                fontWeight: 500,
+                color: done ? "text.secondary" : "text.primary",
+              }}
+            >
+              {title}
+            </Typography>
+            {doneAction}
+          </Box>
+          {!done && children}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -228,240 +348,303 @@ export default function AdminPage() {
   const readyForEvents =
     credsConfigured && googleCreds.connected && folderConnected;
 
-  // Determine which stepper step the admin is on
-  const activeStep = !credsConfigured
-    ? 0
-    : !googleCreds.connected || !folderConnected
-      ? 1
-      : 2;
-
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" fontWeight={700} gutterBottom>
-        Event Admin
-      </Typography>
-      {/* ── Setup stepper ────────────────────────────────────────────── */}
-      {(!readyForEvents || editingCreds) && (
-        <Card variant="outlined" sx={{ mb: 4 }}>
-          <CardHeader
-            title="Setup"
-            subheader="Complete these steps once to connect your Google Account"
-          />
-          <CardContent>
-            <Stepper
-              activeStep={editingCreds ? 0 : activeStep}
-              orientation="vertical"
-            >
-              {/* Step 1 — Google credentials */}
-              <Step>
-                <StepLabel
-                  optional={
-                    credsConfigured && !editingCreds ? (
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          setSetupClientSecret("");
-                          setEditingCreds(true);
-                        }}
-                      >
-                        Edit credentials
-                      </Button>
-                    ) : undefined
-                  }
-                >
-                  Add Google API credentials
-                </StepLabel>
-                <StepContent>
-                  <Typography variant="body2" color="text.secondary" mb={2}>
-                    Create an OAuth 2.0 Web Client and an API Key in the{" "}
-                    <a
-                      href="https://console.cloud.google.com"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Google Cloud Console
-                    </a>
-                    . Enable the <strong>Google Drive API</strong> and{" "}
-                    <strong>Google Picker API</strong> for your project. Add
-                    this app’s URL as an Authorised JavaScript Origin on the
-                    OAuth client.
-                  </Typography>
-                  <Stack spacing={2}>
-                    <TextField
-                      label="Client ID"
-                      value={setupClientId}
-                      onChange={(e) => setSetupClientId(e.target.value)}
-                      placeholder="xxxxxxxx.apps.googleusercontent.com"
-                      fullWidth
-                      size="small"
-                    />
-                    <TextField
-                      label="Client Secret"
-                      type={showSecret ? "text" : "password"}
-                      value={setupClientSecret}
-                      onChange={(e) => setSetupClientSecret(e.target.value)}
-                      placeholder={
-                        editingCreds
-                          ? "Re-enter your Client Secret"
-                          : "GOCSPX-…"
-                      }
-                      helperText={
-                        editingCreds
-                          ? "Always required when updating credentials"
-                          : undefined
-                      }
-                      fullWidth
-                      size="small"
-                      slotProps={{
-                        input: {
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <Button
-                                size="small"
-                                onClick={() => setShowSecret((s) => !s)}
-                              >
-                                {showSecret ? "Hide" : "Show"}
-                              </Button>
-                            </InputAdornment>
-                          ),
-                        },
-                      }}
-                    />
-                    <TextField
-                      label="API Key"
-                      value={setupApiKey}
-                      onChange={(e) => setSetupApiKey(e.target.value)}
-                      placeholder="AIzaSy…"
-                      fullWidth
-                      size="small"
-                    />
-                    {credsError && <Alert severity="error">{credsError}</Alert>}
-                    <Button
-                      variant="contained"
-                      onClick={handleSaveCredentials}
-                      disabled={
-                        savingCreds ||
-                        !setupClientId.trim() ||
-                        !setupClientSecret.trim() ||
-                        !setupApiKey.trim()
-                      }
-                      startIcon={
-                        savingCreds ? <CircularProgress size={18} /> : undefined
-                      }
-                      sx={{ alignSelf: "flex-start" }}
-                    >
-                      {savingCreds ? "Saving…" : "Save Credentials"}
-                    </Button>
-                  </Stack>
-                </StepContent>
-              </Step>
+    <Box sx={{ minHeight: "100dvh", bgcolor: "background.default" }}>
+      {/* ── Top bar ─────────────────────────────────────────────────── */}
+      <Box
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          bgcolor: "background.default",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          px: { xs: 2.5, sm: 4 },
+          py: 1.75,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Box>
+          <Typography
+            sx={{
+              letterSpacing: "0.35em",
+              color: "primary.main",
+              fontSize: "0.62rem",
+              textTransform: "uppercase",
+              lineHeight: 1,
+              mb: 0.4,
+            }}
+          >
+            Memento
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: "0.72rem",
+              color: "text.secondary",
+              letterSpacing: "0.06em",
+            }}
+          >
+            Admin Portal
+          </Typography>
+        </Box>
+        <Tooltip title="Sign out">
+          <IconButton
+            onClick={handleLogout}
+            size="small"
+            sx={{
+              color: "text.secondary",
+              "&:hover": { color: "text.primary" },
+            }}
+          >
+            <LogoutIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
 
-              {/* Step 2 — Connect Google & pick folder */}
-              <Step>
-                <StepLabel>
-                  Sign in with Google & choose a Drive folder
-                </StepLabel>
-                <StepContent>
-                  <Typography variant="body2" color="text.secondary" mb={2}>
-                    Sign in with your Google account to authorise this app and
-                    choose the Drive folder where uploaded photos will be
-                    stored.
-                  </Typography>
-                  {(pickerError || folderError) && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {pickerError ?? folderError}
-                    </Alert>
-                  )}
-                  {folderConnected && (
-                    <Alert severity="success" sx={{ mb: 2 }}>
-                      Folder selected:{" "}
-                      <strong>{driveConfig.rootFolderName}</strong>
-                    </Alert>
-                  )}
+      {/* ── Page content ─────────────────────────────────────────────── */}
+      <Box
+        sx={{
+          maxWidth: 680,
+          mx: "auto",
+          px: { xs: 2.5, sm: 4 },
+          py: { xs: 4, sm: 5 },
+        }}
+      >
+        {/* Global loading */}
+        {loading && (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
+            <CircularProgress size={24} thickness={2} />
+          </Box>
+        )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 4 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* ── Setup ─────────────────────────────────────────────────── */}
+        {(!readyForEvents || editingCreds) && !loading && (
+          <Section
+            title="Setup"
+            subtitle="Connect your Google account once to get started"
+          >
+            <Stack spacing={0} divider={<Divider />}>
+              {/* Step 1 — Credentials */}
+              <SetupStep
+                number={1}
+                title="Add Google API credentials"
+                done={credsConfigured && !editingCreds}
+                doneAction={
+                  credsConfigured && !editingCreds ? (
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setSetupClientSecret("");
+                        setEditingCreds(true);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                  ) : undefined
+                }
+              >
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2, lineHeight: 1.75 }}
+                >
+                  Create an OAuth 2.0 Web Client and an API Key in the{" "}
+                  <Box
+                    component="a"
+                    href="https://console.cloud.google.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    sx={{
+                      color: "primary.main",
+                      textDecoration: "none",
+                      "&:hover": { textDecoration: "underline" },
+                    }}
+                  >
+                    Google Cloud Console
+                  </Box>
+                  . Enable the <strong>Drive API</strong> and{" "}
+                  <strong>Picker API</strong>, then add this app's URL as an
+                  Authorised JavaScript Origin.
+                </Typography>
+                <Stack spacing={1.5}>
+                  <TextField
+                    label="Client ID"
+                    value={setupClientId}
+                    onChange={(e) => setSetupClientId(e.target.value)}
+                    placeholder="xxxxxxxx.apps.googleusercontent.com"
+                    fullWidth
+                    size="small"
+                  />
+                  <TextField
+                    label="Client Secret"
+                    type={showSecret ? "text" : "password"}
+                    value={setupClientSecret}
+                    onChange={(e) => setSetupClientSecret(e.target.value)}
+                    placeholder={
+                      editingCreds ? "Re-enter your Client Secret" : "GOCSPX-…"
+                    }
+                    helperText={
+                      editingCreds
+                        ? "Always required when updating credentials"
+                        : undefined
+                    }
+                    fullWidth
+                    size="small"
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <Button
+                              size="small"
+                              onClick={() => setShowSecret((s) => !s)}
+                              sx={{ fontSize: "0.7rem", minWidth: "auto" }}
+                            >
+                              {showSecret ? "Hide" : "Show"}
+                            </Button>
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                  <TextField
+                    label="API Key"
+                    value={setupApiKey}
+                    onChange={(e) => setSetupApiKey(e.target.value)}
+                    placeholder="AIzaSy…"
+                    fullWidth
+                    size="small"
+                  />
+                  {credsError && <Alert severity="error">{credsError}</Alert>}
                   <Button
                     variant="contained"
-                    startIcon={
-                      pickerLoading || savingFolder ? (
-                        <CircularProgress size={18} color="inherit" />
-                      ) : (
-                        <GoogleIcon />
-                      )
+                    onClick={handleSaveCredentials}
+                    disabled={
+                      savingCreds ||
+                      !setupClientId.trim() ||
+                      !setupClientSecret.trim() ||
+                      !setupApiKey.trim()
                     }
-                    disabled={pickerLoading || savingFolder}
-                    onClick={pickFolder}
+                    startIcon={
+                      savingCreds ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : undefined
+                    }
+                    sx={{ alignSelf: "flex-start" }}
                   >
-                    {pickerLoading
-                      ? "Waiting for Google…"
-                      : savingFolder
-                        ? "Saving…"
-                        : folderConnected
-                          ? "Change Folder"
-                          : "Sign in with Google & Choose Folder"}
+                    {savingCreds ? "Saving…" : "Save Credentials"}
                   </Button>
-                </StepContent>
-              </Step>
+                </Stack>
+              </SetupStep>
 
-              <Step>
-                <StepLabel>Ready</StepLabel>
-                <StepContent />
-              </Step>
-            </Stepper>
-          </CardContent>
-        </Card>
-      )}
-      {/* ── Drive folder summary (once set up) ───────────────────────── */}
-      {readyForEvents && (
-        <Card variant="outlined" sx={{ mb: 4, borderColor: "success.main" }}>
-          <CardContent>
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Stack direction="row" spacing={1} alignItems="center">
-                <FolderIcon color="success" />
-                <Typography fontWeight={500}>
-                  {driveConfig.rootFolderName}
-                </Typography>
-                <Chip
-                  label={driveConfig.rootFolderId}
-                  size="small"
-                  variant="outlined"
-                  sx={{ fontFamily: "monospace" }}
-                />
-              </Stack>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={
-                  pickerLoading || savingFolder ? (
-                    <CircularProgress size={14} />
-                  ) : (
-                    <FolderIcon />
-                  )
-                }
-                disabled={pickerLoading || savingFolder}
-                onClick={pickFolder}
+              {/* Step 2 — Sign in & pick folder */}
+              <SetupStep
+                number={2}
+                title="Sign in with Google & choose a Drive folder"
+                done={folderConnected && googleCreds.connected}
               >
-                Change
-              </Button>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2, lineHeight: 1.75 }}
+                >
+                  Authorise this app and choose the Drive folder where uploaded
+                  photos will be stored.
+                </Typography>
+                {(pickerError || folderError) && (
+                  <Alert severity="error" sx={{ mb: 1.5 }}>
+                    {pickerError ?? folderError}
+                  </Alert>
+                )}
+                {folderConnected && (
+                  <Alert severity="success" sx={{ mb: 1.5 }}>
+                    Folder: <strong>{driveConfig.rootFolderName}</strong>
+                  </Alert>
+                )}
+                <Button
+                  variant="contained"
+                  startIcon={
+                    pickerLoading || savingFolder ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <GoogleIcon />
+                    )
+                  }
+                  disabled={pickerLoading || savingFolder || !credsConfigured}
+                  onClick={pickFolder}
+                >
+                  {pickerLoading
+                    ? "Waiting for Google…"
+                    : savingFolder
+                      ? "Saving…"
+                      : folderConnected
+                        ? "Change Folder"
+                        : "Sign in & Choose Folder"}
+                </Button>
+              </SetupStep>
             </Stack>
-            {(pickerError || folderError) && (
-              <Alert severity="error" sx={{ mt: 1 }}>
-                {pickerError ?? folderError}
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      )}
-      {/* ── Create event ───────────────────────────────────────────── */}
-      <Card variant="outlined" sx={{ mb: 4 }}>
-        <CardHeader title="Create New Event" />
-        <CardContent>
-          <Stack spacing={2}>
+          </Section>
+        )}
+
+        {/* ── Drive folder status bar ───────────────────────────────── */}
+        {readyForEvents && !editingCreds && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              px: 2,
+              py: 1.5,
+              mb: 4,
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "rgba(120, 169, 154, 0.25)",
+              bgcolor: "rgba(120, 169, 154, 0.05)",
+            }}
+          >
+            <FolderIcon
+              sx={{ fontSize: 18, color: "success.main", opacity: 0.8 }}
+            />
+            <Typography
+              sx={{ flex: 1, fontSize: "0.82rem", color: "text.secondary" }}
+            >
+              <Box
+                component="span"
+                sx={{ color: "text.primary", fontWeight: 500 }}
+              >
+                {driveConfig.rootFolderName}
+              </Box>{" "}
+              &nbsp;·&nbsp;{" "}
+              <Box
+                component="span"
+                sx={{ fontFamily: "monospace", fontSize: "0.74rem" }}
+              >
+                {driveConfig.rootFolderId}
+              </Box>
+            </Typography>
+            <Button
+              size="small"
+              disabled={pickerLoading || savingFolder}
+              onClick={pickFolder}
+              sx={{ flexShrink: 0, fontSize: "0.72rem" }}
+            >
+              Change
+            </Button>
+          </Box>
+        )}
+
+        {/* ── Create event ─────────────────────────────────────────── */}
+        <Section title="New Event">
+          <Stack spacing={1.5}>
             {!readyForEvents && !loading && (
-              <Alert severity="warning">
-                Complete the setup steps above before creating events.
+              <Alert severity="warning" sx={{ mb: 0.5 }}>
+                Complete setup above before creating events.
               </Alert>
             )}
             <TextField
@@ -470,9 +653,10 @@ export default function AdminPage() {
               onChange={(e) => setName(e.target.value)}
               disabled={!readyForEvents}
               fullWidth
+              placeholder="Summer Wedding 2026"
             />
             <TextField
-              label="Expires At (optional)"
+              label="Link expires at (optional)"
               type="datetime-local"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
@@ -490,115 +674,138 @@ export default function AdminPage() {
               onClick={handleCreate}
               disabled={creating || !name.trim() || !readyForEvents}
               startIcon={
-                creating ? <CircularProgress size={18} /> : <QrCode2Icon />
+                creating ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <QrCode2Icon />
+                )
               }
+              sx={{ alignSelf: "flex-start" }}
             >
               {creating ? "Creating…" : "Create & Generate QR Code"}
             </Button>
           </Stack>
-        </CardContent>
-      </Card>
-      {/* Event list */}
-      <Typography variant="h5" fontWeight={600} gutterBottom>
-        Events
-      </Typography>
-      {loading && (
-        <Box display="flex" justifyContent="center" py={4}>
-          <CircularProgress />
-        </Box>
-      )}
-      {error && <Alert severity="error">{error}</Alert>}
-      {!loading && events.length === 0 && (
-        <Typography color="text.secondary">No events yet.</Typography>
-      )}
-      <Stack spacing={2}>
-        {events.map((event) => {
-          const expired =
-            event.expiresAt !== null && new Date(event.expiresAt) < new Date();
-          return (
-            <Card key={event.id} variant="outlined">
-              <CardContent>
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="flex-start"
+        </Section>
+
+        {/* ── Event list ───────────────────────────────────────────── */}
+        <Section title="Events">
+          {!loading && events.length === 0 && (
+            <Typography variant="body2" color="text.secondary">
+              No events yet. Create one above.
+            </Typography>
+          )}
+          <Stack spacing={2}>
+            {events.map((event) => {
+              const expired =
+                event.expiresAt !== null &&
+                new Date(event.expiresAt) < new Date();
+              return (
+                <Box
+                  key={event.id}
+                  sx={{
+                    border: "1px solid",
+                    borderColor: expired
+                      ? "rgba(217, 112, 112, 0.15)"
+                      : "rgba(200, 169, 110, 0.1)",
+                    borderRadius: 2,
+                    px: 2.5,
+                    py: 2,
+                    bgcolor: "background.paper",
+                  }}
                 >
-                  <Box>
-                    <Typography variant="h6">{event.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {event.expiresAt ? (
-                        <>
-                          Expires: {new Date(event.expiresAt).toLocaleString()}
-                          {expired && (
-                            <Box component="span" color="error.main" ml={1}>
-                              (expired)
-                            </Box>
-                          )}
-                        </>
-                      ) : (
-                        "No expiration"
-                      )}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 0.5 }}
-                    >
-                      URL: <code>/upload/{event.slug}</code>
-                    </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 1,
+                    }}
+                  >
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography
+                        variant="h6"
+                        sx={{ fontSize: "1rem", mb: 0.4, lineHeight: 1.35 }}
+                      >
+                        {event.name}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color={expired ? "error.main" : "text.secondary"}
+                        sx={{ fontSize: "0.78rem", mb: 0.5 }}
+                      >
+                        {event.expiresAt
+                          ? `${expired ? "Expired" : "Expires"} ${new Date(event.expiresAt).toLocaleString()}`
+                          : "No expiration"}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontSize: "0.74rem",
+                          fontFamily: "monospace",
+                          color: "text.secondary",
+                          opacity: 0.7,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        /upload/{event.slug}
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                      <Tooltip title="Open upload page">
+                        <span>
+                          <IconButton
+                            component="a"
+                            href={`/upload/${event.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            size="small"
+                            disabled={expired}
+                            sx={{ color: "text.secondary" }}
+                          >
+                            <OpenInNewIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Open Drive folder">
+                        <IconButton
+                          component="a"
+                          href={`https://drive.google.com/drive/folders/${event.driveFolderId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          size="small"
+                          sx={{ color: "text.secondary" }}
+                        >
+                          <FolderOpenIcon sx={{ fontSize: 17 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete event">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDelete(event.id)}
+                          sx={{
+                            color: "text.secondary",
+                            "&:hover": { color: "error.main" },
+                          }}
+                        >
+                          <DeleteOutlineIcon sx={{ fontSize: 17 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   </Box>
-                  <Stack direction="row" spacing={1}>
-                    <Tooltip title="Open upload page">
-                      <IconButton
-                        component="a"
-                        href={`/upload/${event.slug}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        disabled={expired}
-                      >
-                        <OpenInNewIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Open Drive folder">
-                      <IconButton
-                        component="a"
-                        href={`https://drive.google.com/drive/folders/${event.driveFolderId}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <FolderOpenIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete event">
-                      <IconButton
-                        color="error"
-                        onClick={() => handleDelete(event.id)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
-                </Stack>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </Stack>
-      {/* ── Security ─────────────────────────────────────────────────── */}
-      <Card variant="outlined" sx={{ mt: 4, mb: 4 }}>
-        <CardHeader
+                </Box>
+              );
+            })}
+          </Stack>
+        </Section>
+
+        {/* ── Security ─────────────────────────────────────────────── */}
+        <Section
           title="Security"
-          avatar={<LockIcon color="action" />}
-          action={
-            <Tooltip title="Logout">
-              <IconButton onClick={handleLogout}>
-                <LogoutIcon />
-              </IconButton>
-            </Tooltip>
-          }
-        />
-        <CardContent>
-          <Stack spacing={2} maxWidth={400}>
+          icon={<LockOutlinedIcon sx={{ fontSize: 16, opacity: 0.5 }} />}
+        >
+          <Stack spacing={1.5} sx={{ maxWidth: 380 }}>
             <Typography variant="body2" color="text.secondary">
               Change the admin portal password.
             </Typography>
@@ -633,7 +840,7 @@ export default function AdminPage() {
               <Alert severity="error">{changePasswordError}</Alert>
             )}
             {changePasswordSuccess && (
-              <Alert severity="success">Password changed successfully.</Alert>
+              <Alert severity="success">Password changed.</Alert>
             )}
             <Button
               variant="contained"
@@ -646,7 +853,7 @@ export default function AdminPage() {
               }
               startIcon={
                 changingPassword ? (
-                  <CircularProgress size={18} color="inherit" />
+                  <CircularProgress size={16} color="inherit" />
                 ) : undefined
               }
               sx={{ alignSelf: "flex-start" }}
@@ -654,37 +861,58 @@ export default function AdminPage() {
               {changingPassword ? "Saving…" : "Change Password"}
             </Button>
           </Stack>
-        </CardContent>
-      </Card>
-      {/* QR code dialog */}
+        </Section>
+      </Box>
+
+      {/* ── QR dialog ───────────────────────────────────────────────── */}
       <Dialog
         open={!!qrDialog}
         onClose={() => setQrDialog(null)}
         maxWidth="xs"
         fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: "background.paper",
+            backgroundImage: "none",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 3,
+          },
+        }}
       >
-        <DialogTitle>QR Code Generated</DialogTitle>
+        <DialogTitle sx={{ textAlign: "center", pt: 4, pb: 1 }}>
+          <Typography variant="h5">{qrDialog?.event.name}</Typography>
+        </DialogTitle>
         <DialogContent>
           {qrDialog && (
-            <Stack spacing={2} alignItems="center" py={2}>
-              <Typography variant="body1" fontWeight={600}>
-                {qrDialog.event.name}
-              </Typography>
+            <Stack spacing={2.5} alignItems="center" py={1}>
+              {/* QR code with subtle gold border */}
               <Box
-                component="img"
-                src={qrDialog.qrCodeDataUrl}
-                alt="QR code"
-                sx={{ width: "100%", maxWidth: 300 }}
-              />
+                sx={{
+                  p: 1.5,
+                  border: "1px solid",
+                  borderColor: "rgba(200, 169, 110, 0.2)",
+                  borderRadius: 2,
+                  bgcolor: "#fff",
+                }}
+              >
+                <Box
+                  component="img"
+                  src={qrDialog.qrCodeDataUrl}
+                  alt="QR code"
+                  sx={{ width: "100%", maxWidth: 240, display: "block" }}
+                />
+              </Box>
               <Typography
                 variant="body2"
                 color="text.secondary"
                 textAlign="center"
+                sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
               >
                 {qrDialog.uploadUrl}
               </Typography>
               <Divider flexItem />
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={1} pb={1}>
                 <Button
                   variant="outlined"
                   onClick={() => {
@@ -704,6 +932,6 @@ export default function AdminPage() {
           )}
         </DialogContent>
       </Dialog>
-    </Container>
+    </Box>
   );
 }

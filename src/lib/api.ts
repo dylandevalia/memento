@@ -84,9 +84,17 @@ export const api = {
 
     validate: (token: string) =>
       request<ValidateTokenResponse>(`/events/${token}/validate`),
+
+    qr: (slug: string) =>
+      request<{ qrCodeDataUrl: string; uploadUrl: string }>(
+        `/events/${slug}/qr`,
+      ),
   },
 
   upload: {
+    deleteFile: (slug: string, driveId: string) =>
+      request<void>(`/upload/${slug}/${driveId}`, { method: "DELETE" }),
+
     files: (token: string, files: File[]) => {
       const form = new FormData();
       for (const file of files) form.append("files", file);

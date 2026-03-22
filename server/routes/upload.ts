@@ -1,6 +1,6 @@
 import type { UploadResponse } from "../../src/types";
 import { getEventBySlug } from "../lib/db";
-import { uploadFileToDrive } from "../lib/drive";
+import { moveFileToBin, uploadFileToDrive } from "../lib/drive";
 
 export const uploadRoutes = {
   "/api/upload/:token": {
@@ -79,6 +79,33 @@ export const uploadRoutes = {
         files: uploaded,
       };
       return Response.json(body, { status: 201 });
+    },
+  },
+
+  "/api/upload/:slug/:driveId": {
+    async DELETE(
+      req: Request & { params: Record<string, string> },
+    ): Promise<Response> {
+      const { slug, driveId } = req.params;
+      if (!slug || !driveId) {
+        return Response.json(
+          { error: "Missing slug or driveId" },
+          { status: 400 },
+        );
+      }
+      const event = getEventBySlug(slug);
+      if (!event) {
+        return Response.json({ error: "Event not found" }, { status: 404 });
+      }
+      try {
+        await moveFileToBin(driveId, event.driveFolderId);
+        return new Response(null, { status: 204 });
+      } catch (err) {
+        return Response.json(
+          { error: (err as Error).message },
+          { status: 502 },
+        );
+      }
     },
   },
 };

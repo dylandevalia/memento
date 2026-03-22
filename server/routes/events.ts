@@ -141,6 +141,33 @@ export const eventRoutes = {
     },
   },
 
+  "/api/events/:token/qr": {
+    /** Return a QR code data URL for the event's upload page */
+    async GET(
+      req: Request & { params: Record<string, string> },
+    ): Promise<Response> {
+      const token = req.params.token;
+      if (!token) {
+        return Response.json({ error: "Missing slug" }, { status: 400 });
+      }
+      const event = getEventBySlug(token);
+      if (!event) {
+        return Response.json({ error: "Event not found" }, { status: 404 });
+      }
+      const baseUrl = getBaseUrl(req);
+      const uploadUrl = `${baseUrl}/upload/${event.slug}`;
+      try {
+        const qrCodeDataUrl = await generateQrDataUrl(uploadUrl);
+        return Response.json({ qrCodeDataUrl, uploadUrl });
+      } catch (err) {
+        return Response.json(
+          { error: (err as Error).message },
+          { status: 500 },
+        );
+      }
+    },
+  },
+
   "/api/events/:token/validate": {
     /** Validate an event by its slug */
     async GET(

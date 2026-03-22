@@ -18,6 +18,12 @@ db.exec(`
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS thumbnail_cache (
+    drive_id   TEXT PRIMARY KEY,
+    url        TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
 `);
 
 // Migration: make expires_at nullable if the column was created with NOT NULL
@@ -133,4 +139,26 @@ export function getPasswordHash(): string | null {
 
 export function setPasswordHash(hash: string): void {
   setConfig("admin_password_hash", hash);
+}
+
+export function getCachedThumbnail(driveId: string): string | null {
+  const row = db
+    .prepare(
+      "SELECT url, expires_at FROM thumbnail_cache WHERE drive_id = $driveId",
+    )
+    .get({ $driveId: driveId }) as { url: string; expires_at: number } | null;
+  if (!row || row.expires_at < Date.now()) return null;
+  return row.url;
+}
+
+export function setCachedThumbnail(
+  driveId: string,
+  url: string,
+  expiresAt: number,
+): void {
+  db.prepare(
+    `INSERT INTO thumbnail_cache (drive_id, url, expires_at)
+     VALUES ($driveId, $url, $expiresAt)
+     ON CONFLICT(drive_id) DO UPDATE SET url = excluded.url, expires_at = excluded.expires_at`,
+  ).run({ $driveId: driveId, $url: url, $expiresAt: expiresAt });
 }

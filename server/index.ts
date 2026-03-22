@@ -92,6 +92,18 @@ const server = serve({
         return withCors(await eventRoutes["/api/events"].POST(req));
     }
 
+    // /api/events/:token/qr  (must come before /:id)
+    const qrMatch = pathname.match(/^\/api\/events\/([^/]+)\/qr$/);
+    if (qrMatch) {
+      const token = qrMatch[1] ?? "";
+      if (method === "GET")
+        return withCors(
+          await eventRoutes["/api/events/:token/qr"].GET(
+            addParams(req, { token }),
+          ),
+        );
+    }
+
     // /api/events/:token/validate  (must come before /:id)
     const validateMatch = pathname.match(/^\/api\/events\/([^/]+)\/validate$/);
     if (validateMatch) {
@@ -122,6 +134,19 @@ const server = serve({
         return withCors(
           await uploadRoutes["/api/upload/:token"].POST(
             addParams(req, { token }),
+          ),
+        );
+    }
+
+    // ── File delete routes ────────────────────────────────────────────
+    const fileDeleteMatch = pathname.match(/^\/api\/upload\/([^/]+)\/([^/]+)$/);
+    if (fileDeleteMatch) {
+      const slug = fileDeleteMatch[1] ?? "";
+      const driveId = fileDeleteMatch[2] ?? "";
+      if (method === "DELETE")
+        return withCors(
+          await uploadRoutes["/api/upload/:slug/:driveId"].DELETE(
+            addParams(req, { slug, driveId }),
           ),
         );
     }
