@@ -34,6 +34,13 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+function formatEta(seconds: number): string {
+  if (seconds < 5) return "almost done";
+  if (seconds < 60) return `~${Math.round(seconds)}s left`;
+  const mins = Math.round(seconds / 60);
+  return `~${mins} min${mins !== 1 ? "s" : ""} left`;
+}
+
 interface UploadRecord {
   name: string;
   driveId: string;
@@ -207,6 +214,11 @@ export default function UploadPage() {
     qrCodeDataUrl: string;
     uploadUrl: string;
   } | null>(null);
+  // Per-file upload progress
+  const [uploadingIdx, setUploadingIdx] = useState(-1);
+  const [doneIndices, setDoneIndices] = useState<Set<number>>(new Set());
+  const [currentFileLoaded, setCurrentFileLoaded] = useState(0);
+  const [uploadStartTime, setUploadStartTime] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Create object URLs for thumbnails and revoke them when the file list changes
@@ -221,6 +233,13 @@ export default function UploadPage() {
   );
   const sizePct = Math.min((totalBytes / MAX_UPLOAD_BYTES) * 100, 100);
   const sizeOverLimit = totalBytes > MAX_UPLOAD_BYTES;
+
+  // How many bytes have been sent so far (completed files + current file XHR progress)
+  const totalBytesUploadedSoFar = useMemo(() => {
+    let done = 0;
+    for (const idx of doneIndices) done += selectedFiles[idx]?.size ?? 0;
+    return done + currentFileLoaded;
+  }, [doneIndices, currentFileLoaded, selectedFiles]);
   useEffect(() => {
     return () => {
       for (const url of previewUrls) URL.revokeObjectURL(url);
@@ -311,24 +330,52 @@ export default function UploadPage() {
     if (!slug || selectedFiles.length === 0) return;
     setStatus("uploading");
     setError(null);
-    try {
-      const result = await api.upload.files(slug, selectedFiles);
-      const newRecords: UploadRecord[] = result.files.map((f) => ({
-        name: f.name,
-        driveId: f.driveId,
-        uploadedAt: new Date().toISOString(),
-      }));
-      setUploadHistory((prev) => {
-        const merged = [...newRecords, ...prev];
-        saveHistory(slug, merged);
-        return merged;
-      });
-      setSelectedFiles([]);
-      setStatus("done");
-    } catch (err) {
-      setError((err as Error).message);
-      setStatus("ready");
+    setDoneIndices(new Set());
+    setCurrentFileLoaded(0);
+    setUploadingIdx(0);
+    setUploadStartTime(Date.now());
+
+    const allUploaded: { name: string; driveId: string }[] = [];
+    const failed: { name: string; error: string }[] = [];
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      if (!file) continue;
+      setUploadingIdx(i);
+      setCurrentFileLoaded(0);
+      try {
+        const result = await api.upload.uploadFileWithProgress(
+          slug,
+          file,
+          (loaded) => setCurrentFileLoaded(loaded),
+        );
+        allUploaded.push(...result.files);
+        setDoneIndices((prev) => new Set([...prev, i]));
+      } catch (err) {
+        failed.push({ name: file.name, error: (err as Error).message });
+      }
     }
+
+    if (allUploaded.length === 0) {
+      setError(`All uploads failed. ${failed[0]?.error ?? ""}`);
+      setStatus("ready");
+      setUploadingIdx(-1);
+      return;
+    }
+
+    const newRecords: UploadRecord[] = allUploaded.map((f) => ({
+      name: f.name,
+      driveId: f.driveId,
+      uploadedAt: new Date().toISOString(),
+    }));
+    setUploadHistory((prev) => {
+      const merged = [...newRecords, ...prev];
+      saveHistory(slug, merged);
+      return merged;
+    });
+    setSelectedFiles([]);
+    setUploadingIdx(-1);
+    setStatus("done");
   }, [slug, selectedFiles]);
 
   return (
@@ -679,28 +726,83 @@ export default function UploadPage() {
                           pointerEvents: "none",
                         }}
                       />
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          setSelectedFiles((prev) =>
-                            prev.filter((x) => x.name !== f.name),
-                          )
-                        }
-                        sx={{
-                          position: "absolute",
-                          top: 5,
-                          right: 5,
-                          width: 26,
-                          height: 26,
-                          bgcolor: "rgba(0,0,0,0.50)",
-                          backdropFilter: "blur(6px)",
-                          color: "rgba(255,255,255,0.85)",
-                          borderRadius: "50%",
-                          "&:hover": { bgcolor: "rgba(0,0,0,0.70)" },
-                        }}
-                      >
-                        <CloseIcon sx={{ fontSize: 13 }} />
-                      </IconButton>
+                      {/* Remove button — hidden during upload */}
+                      {status !== "uploading" && (
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            setSelectedFiles((prev) =>
+                              prev.filter((x) => x.name !== f.name),
+                            )
+                          }
+                          sx={{
+                            position: "absolute",
+                            top: 5,
+                            right: 5,
+                            width: 26,
+                            height: 26,
+                            bgcolor: "rgba(0,0,0,0.50)",
+                            backdropFilter: "blur(6px)",
+                            color: "rgba(255,255,255,0.85)",
+                            borderRadius: "50%",
+                            "&:hover": { bgcolor: "rgba(0,0,0,0.70)" },
+                          }}
+                        >
+                          <CloseIcon sx={{ fontSize: 13 }} />
+                        </IconButton>
+                      )}
+                      {/* Upload status overlay */}
+                      {status === "uploading" && (
+                        <Box
+                          sx={{
+                            position: "absolute",
+                            inset: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            bgcolor: doneIndices.has(i)
+                              ? "rgba(0,0,0,0.55)"
+                              : uploadingIdx === i
+                                ? "rgba(0,0,0,0.35)"
+                                : "rgba(0,0,0,0.5)",
+                            transition: "background-color 0.3s",
+                          }}
+                        >
+                          {doneIndices.has(i) ? (
+                            <Box
+                              sx={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: "50%",
+                                border: "1.5px solid",
+                                borderColor: "primary.main",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <CheckIcon
+                                sx={{ fontSize: 16, color: "primary.main" }}
+                              />
+                            </Box>
+                          ) : uploadingIdx === i ? (
+                            <CircularProgress
+                              size={24}
+                              thickness={2.5}
+                              sx={{ color: "primary.main" }}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                bgcolor: "rgba(255,255,255,0.3)",
+                              }}
+                            />
+                          )}
+                        </Box>
+                      )}
                     </Box>
                   ))}
                 </Box>
@@ -713,9 +815,75 @@ export default function UploadPage() {
                 {error}
               </Alert>
             )}
-            {status === "uploading" && (
-              <LinearProgress sx={{ mt: 2.5, mx: 0.25 }} />
-            )}
+            {status === "uploading" &&
+              (() => {
+                const uploadPct =
+                  totalBytes > 0
+                    ? Math.min(
+                        (totalBytesUploadedSoFar / totalBytes) * 100,
+                        100,
+                      )
+                    : 0;
+                const elapsedSec = (Date.now() - uploadStartTime) / 1000;
+                const speed =
+                  elapsedSec > 1 ? totalBytesUploadedSoFar / elapsedSec : 0;
+                const remainingSec =
+                  speed > 0
+                    ? (totalBytes - totalBytesUploadedSoFar) / speed
+                    : null;
+                return (
+                  <Box sx={{ mt: 2.5, mx: 0.25 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mb: 0.75,
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "0.68rem",
+                          color: "text.secondary",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        {uploadingIdx >= 0
+                          ? `File ${uploadingIdx + 1} of ${selectedFiles.length}`
+                          : "Finishing…"}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.68rem",
+                          color: "text.secondary",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        {remainingSec !== null
+                          ? formatEta(remainingSec)
+                          : formatBytes(totalBytesUploadedSoFar)}
+                      </Typography>
+                    </Box>
+                    <LinearProgress
+                      variant="determinate"
+                      value={uploadPct}
+                      sx={{ borderRadius: 1 }}
+                    />
+                    <Typography
+                      sx={{
+                        fontSize: "0.6rem",
+                        color: "text.secondary",
+                        opacity: 0.45,
+                        mt: 0.6,
+                        textAlign: "right",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {formatBytes(totalBytesUploadedSoFar)} /{" "}
+                      {formatBytes(totalBytes)}
+                    </Typography>
+                  </Box>
+                );
+              })()}
 
             {/* Upload CTA */}
             <Button

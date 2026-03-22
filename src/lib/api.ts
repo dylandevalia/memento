@@ -112,5 +112,30 @@ export const api = {
         },
       );
     },
+
+    uploadFileWithProgress: (
+      token: string,
+      file: File,
+      onProgress: (loaded: number, total: number) => void,
+    ): Promise<UploadResponse> =>
+      new Promise((resolve, reject) => {
+        const form = new FormData();
+        form.append("files", file);
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(e.loaded, e.total);
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText) as UploadResponse);
+          } else {
+            const err = JSON.parse(xhr.responseText) as { error?: string };
+            reject(new Error(err.error ?? xhr.statusText));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.open("POST", `/api/upload/${token}`);
+        xhr.send(form);
+      }),
   },
 };
