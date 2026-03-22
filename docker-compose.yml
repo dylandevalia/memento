@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    # Run with /data as the working directory so data.db is written to the
+    # persistent volume rather than inside the container layer.
+    working_dir: /data
+    volumes:
+      - memento-data:/data
+
+volumes:
+  memento-data:
