@@ -21,7 +21,9 @@ body {
   *,
   ::before,
   ::after {
+    /* biome-ignore lint/complexity/noImportantStyles: intentional accessibility override to suppress animations */
     animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: intentional accessibility override to suppress transitions */
     transition-duration: 0.01ms !important;
   }
 }
