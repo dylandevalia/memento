@@ -30,6 +30,8 @@ function addParams(
 
 const server = serve({
   port,
+  // Default is 128 MB — raise to 2 GB to handle large video uploads.
+  maxRequestBodySize: 2 * 1024 * 1024 * 1024,
 
   async fetch(req) {
     const url = new URL(req.url);

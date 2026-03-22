@@ -94,12 +94,32 @@ docker compose up -d
 docker compose pull && docker compose up -d
 ```
 
-The app is served on port `3000`. Put Nginx or Caddy in front for HTTPS:
+The app is served on port `3000`. Put Nginx or Caddy in front for HTTPS. Make sure to raise the upload body limit to match the server (2 GB):
+
+**Caddy** (handles HTTPS automatically):
 
 ```
 # Caddyfile
 your-domain.com {
+    request_body {
+        max_size 2GB
+    }
     reverse_proxy localhost:3000
+}
+```
+
+**Nginx:**
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    client_max_body_size 2g;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_read_timeout 300s;
+    }
 }
 ```
 

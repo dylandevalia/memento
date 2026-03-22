@@ -24,6 +24,16 @@ import type { ValidateTokenResponse } from "../types";
 
 type Status = "validating" | "invalid" | "ready" | "uploading" | "done";
 
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 interface UploadRecord {
   name: string;
   driveId: string;
@@ -204,6 +214,13 @@ export default function UploadPage() {
     () => selectedFiles.map((f) => URL.createObjectURL(f)),
     [selectedFiles],
   );
+
+  const totalBytes = useMemo(
+    () => selectedFiles.reduce((sum, f) => sum + f.size, 0),
+    [selectedFiles],
+  );
+  const sizePct = Math.min((totalBytes / MAX_UPLOAD_BYTES) * 100, 100);
+  const sizeOverLimit = totalBytes > MAX_UPLOAD_BYTES;
   useEffect(() => {
     return () => {
       for (const url of previewUrls) URL.revokeObjectURL(url);
@@ -523,7 +540,7 @@ export default function UploadPage() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    mb: 1.5,
+                    mb: 1,
                     px: 0.25,
                   }}
                 >
@@ -551,6 +568,60 @@ export default function UploadPage() {
                   >
                     Add more
                   </Button>
+                </Box>
+
+                {/* Size progress bar */}
+                <Box sx={{ px: 0.25, mb: 1.5 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      mb: 0.5,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: "0.62rem",
+                        color: sizeOverLimit ? "error.main" : "text.secondary",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {sizeOverLimit
+                        ? `Exceeds 2 GB limit by ${formatBytes(totalBytes - MAX_UPLOAD_BYTES)}`
+                        : formatBytes(totalBytes)}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.62rem",
+                        color: "text.secondary",
+                        opacity: 0.5,
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      2 GB max
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      height: "2px",
+                      borderRadius: 1,
+                      bgcolor: "rgba(255,255,255,0.07)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        height: "100%",
+                        width: `${sizePct}%`,
+                        bgcolor: sizeOverLimit
+                          ? "error.main"
+                          : sizePct > 80
+                            ? "warning.main"
+                            : "primary.main",
+                        transition: "width 0.3s ease, background-color 0.3s",
+                      }}
+                    />
+                  </Box>
                 </Box>
 
                 {/* 3-column photo grid */}
@@ -651,7 +722,11 @@ export default function UploadPage() {
               variant="contained"
               fullWidth
               size="large"
-              disabled={selectedFiles.length === 0 || status === "uploading"}
+              disabled={
+                selectedFiles.length === 0 ||
+                status === "uploading" ||
+                sizeOverLimit
+              }
               onClick={handleUpload}
               sx={{ mt: 3 }}
               startIcon={
