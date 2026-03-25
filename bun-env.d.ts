@@ -16,6 +16,14 @@ declare module "*.module.css" {
   export = classes;
 }
 
+declare module "*.module.scss" {
+  /**
+   * A record of class names to their corresponding CSS module classes
+   */
+  const classes: { readonly [key: string]: string };
+  export = classes;
+}
+
 declare module "bun" {
   interface Env {
     NODE_ENV?: "development" | "production" | "test";
