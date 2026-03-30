@@ -1,12 +1,34 @@
 import type { UploadResponse } from "../../src/types";
-import { getEventBySlug } from "../lib/db";
+import { getEventBySlug, recordUpload } from "../lib/db";
 import { moveFileToBin, uploadFileToDrive } from "../lib/drive";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitResponse,
+} from "../lib/rateLimit";
 
 export const uploadRoutes = {
   "/api/upload/:token": {
     async POST(
       req: Request & { params: Record<string, string> },
     ): Promise<Response> {
+      // Rate limiting: 50 uploads per minute per IP
+      const clientIp = getClientIp(req);
+      console.log(`[Upload] Client IP: ${clientIp}`);
+
+      try {
+        const rateLimit = checkRateLimit(`upload:${clientIp}`, 50, 60000);
+        console.log(`[Upload] Rate limit check:`, rateLimit);
+
+        if (!rateLimit.allowed) {
+          console.log(`[Upload] Rate limit exceeded for ${clientIp}`);
+          return rateLimitResponse(rateLimit.resetTime);
+        }
+      } catch (error) {
+        console.error(`[Upload] Rate limit check error:`, error);
+        // Continue with upload if rate limit check fails
+      }
+
       const token = req.params.token;
       if (!token) {
         return Response.json({ error: "Missing slug" }, { status: 400 });
@@ -37,6 +59,9 @@ export const uploadRoutes = {
         return Response.json({ error: "No files provided" }, { status: 400 });
       }
 
+      // Extract optional uploader name from FormData
+      const uploaderName = formData.get("uploaderName") as string | null;
+
       const invalidFiles = files.filter(
         (f) => !f.type.startsWith("image/") && !f.type.startsWith("video/"),
       );
@@ -60,8 +85,12 @@ export const uploadRoutes = {
             file.type || "application/octet-stream",
             buffer,
             event.driveFolderId,
+            uploaderName || undefined,
           );
           uploaded.push({ name: file.name, driveId });
+
+          // Record the upload in the database
+          recordUpload(event.id, driveId, file.name, uploaderName);
         } catch (err) {
           failed.push({ name: file.name, error: (err as Error).message });
         }
