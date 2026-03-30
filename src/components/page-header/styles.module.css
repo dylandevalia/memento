@@ -1,0 +1,26 @@
+.pageHeader {
+  font-family: var(--font-brand);
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: calc(32px + 0.7rem);
+
+  h3 {
+    margin: 0;
+  }
+
+  .qrCode {
+    align-self: flex-start;
+
+    &::after {
+      content: "share me";
+      font-family: var(--font-body);
+      font-size: 0.7rem;
+      position: absolute;
+      top: 100%;
+      white-space: nowrap;
+    }
+  }
+}

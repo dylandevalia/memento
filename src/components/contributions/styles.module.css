@@ -1,0 +1,21 @@
+.contributions {
+  width: 100%;
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 1rem;
+
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    color: rgb(var(--mui-grey-700) / 80%);
+
+    div {
+      flex: 1;
+      height: 1px;
+      background-color: rgb(var(--mui-grey-300) / 80%);
+    }
+  }
+}

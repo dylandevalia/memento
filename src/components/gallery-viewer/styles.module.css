@@ -1,0 +1,100 @@
+.galleryViewer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0.25rem;
+  width: 100%;
+  border-radius: 2rem;
+  overflow: hidden;
+
+  .thumbnailWrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .thumbnail {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 4px;
+    display: block;
+    animation-composition: add;
+
+    &.loading {
+      opacity: 0;
+    }
+
+    &.uploading {
+      will-change: transform;
+      animation: shake 0.5s linear infinite;
+    }
+
+    &.uploaded {
+      will-change: transform, opacity, filter;
+      animation: faded 300ms ease-out forwards;
+    }
+
+    &.deleting {
+      will-change: transform, opacity;
+      animation: eraseOut 300ms ease-out forwards;
+    }
+  }
+
+  .deleteButton {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    background-color: rgb(var(--mui-grey-900) / 70%);
+    color: rgb(var(--mui-grey-200));
+    border: none;
+
+    z-index: 1;
+
+    > svg {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    &:hover {
+      background-color: rgb(var(--mui-grey-900) / 90%);
+    }
+  }
+}
+
+@keyframes eraseOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8) rotate(-3deg);
+  }
+}
+
+@keyframes shake {
+  0% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+  75% {
+    transform: rotate(-5deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes faded {
+  to {
+    opacity: 0.36;
+    transform: scale(0.8);
+    filter: grayscale(100%);
+  }
+}
