@@ -2,5 +2,33 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.biome": "explicit",
     "source.organizeImports.biome": "explicit"
-  }
+  },
+  "editor.defaultFormatter": "biomejs.biome",
+
+  "workbench.editor.customLabels.patterns": {
+    "*/**/index.{js,jsx,ts,tsx}": "${dirname} (${extname})",
+    "*/**/styles.module.{css,scss}": "${dirname} (styles)"
+  },
+
+  "workbench.colorCustomizations": {
+    "activityBar.activeBackground": "#2c89a1",
+    "activityBar.background": "#2c89a1",
+    "activityBar.foreground": "#e7e7e7",
+    "activityBar.inactiveForeground": "#e7e7e799",
+    "activityBarBadge.background": "#7d226b",
+    "activityBarBadge.foreground": "#e7e7e7",
+    "commandCenter.border": "#e7e7e799",
+    "sash.hoverBorder": "#2c89a1",
+    "statusBar.background": "#216779",
+    "statusBar.foreground": "#e7e7e7",
+    "statusBarItem.hoverBackground": "#2c89a1",
+    "statusBarItem.remoteBackground": "#216779",
+    "statusBarItem.remoteForeground": "#e7e7e7",
+    "titleBar.activeBackground": "#216779",
+    "titleBar.activeForeground": "#e7e7e7",
+    "titleBar.inactiveBackground": "#21677999",
+    "titleBar.inactiveForeground": "#e7e7e799"
+  },
+  "peacock.remoteColor": "#216779",
+  "cSpell.words": ["gdrive"]
 }

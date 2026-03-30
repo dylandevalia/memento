@@ -5,7 +5,7 @@ A self-hosted photo and video uploader for events. Guests scan a QR code and upl
 ## Features
 
 - **Event management** — create named events with optional expiration dates, each backed by its own Drive subfolder
-- **QR code generation** — each event gets a shareable QR code linking to a slug-based upload URL (e.g. `/upload/summer-wedding`)
+- **QR code generation** — each event gets a shareable QR code linking to a slug-based upload URL (e.g. `/event/summer-wedding`)
 - **Photo & video uploads** — guests select files from their device; a thumbnail grid previews selections before uploading
 - **Upload history** — previously uploaded files are remembered per device and displayed as a lazy-loaded thumbnail grid (fetched from Drive)
 - **Password-protected admin** — the admin portal requires a password stored as a bcrypt hash in the database; changeable from within the portal
@@ -172,7 +172,7 @@ src/
   pages/
     LoginPage.tsx   # Password gate
     AdminPage.tsx   # Event management + setup
-    UploadPage.tsx  # Guest upload interface
+    EventPage.tsx   # Guest upload interface
   lib/
     api.ts          # Typed fetch wrappers
     auth.ts         # Shared auth session key
