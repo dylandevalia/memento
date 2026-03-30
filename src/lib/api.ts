@@ -92,25 +92,23 @@ export const api = {
   },
 
   upload: {
+    getThumbnailUrl: (driveId: string) => `/api/thumbnail/${driveId}`,
+
     deleteFile: (slug: string, driveId: string) =>
       request<void>(`/upload/${slug}/${driveId}`, { method: "DELETE" }),
 
-    files: (token: string, files: File[]) => {
+    files: async (token: string, files: File[]) => {
       const form = new FormData();
       for (const file of files) form.append("files", file);
-      return fetch(`/api/upload/${token}`, { method: "POST", body: form }).then(
-        async (res) => {
-          if (!res.ok) {
-            const err = await res
-              .json()
-              .catch(() => ({ error: res.statusText }));
-            throw new Error(
-              (err as { error?: string }).error ?? res.statusText,
-            );
-          }
-          return res.json() as Promise<UploadResponse>;
-        },
-      );
+      const res = await fetch(`/api/upload/${token}`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error((err as { error?: string }).error ?? res.statusText);
+      }
+      return res.json() as Promise<UploadResponse>;
     },
 
     uploadFileWithProgress: (

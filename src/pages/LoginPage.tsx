@@ -100,12 +100,12 @@ export default function LoginPage() {
     >
       {/* Wordmark */}
       <Typography
+        className="rainbow-text"
         sx={{
-          letterSpacing: "0.35em",
-          color: "primary.main",
-          fontSize: "0.68rem",
-          textTransform: "uppercase",
-          mb: 5,
+          fontFamily: 'var(--font-heading)',
+          fontSize: "2rem",
+          letterSpacing: "0.06em",
+          mb: 4,
         }}
       >
         Memento
@@ -114,15 +114,18 @@ export default function LoginPage() {
       {/* Lock icon */}
       <Box
         sx={{
-          width: 56,
-          height: 56,
+          width: 64,
+          height: 64,
           borderRadius: "50%",
-          border: "1.5px solid",
-          borderColor: "rgba(200, 169, 110, 0.35)",
+          background:
+            "linear-gradient(135deg, rgba(255,77,158,0.15), rgba(168,85,247,0.15))",
+          border: "2px solid",
+          borderColor: "rgba(168, 85, 247, 0.4)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           mb: 3,
+          animation: "bounce-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both",
         }}
       >
         <LockOutlinedIcon

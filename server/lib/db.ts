@@ -24,6 +24,19 @@ db.exec(`
     url        TEXT NOT NULL,
     expires_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS uploads (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id        INTEGER NOT NULL,
+    drive_id        TEXT    NOT NULL,
+    file_name       TEXT    NOT NULL,
+    uploader_name   TEXT,
+    uploaded_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_uploads_event_id ON uploads(event_id);
+  CREATE INDEX IF NOT EXISTS idx_uploads_drive_id ON uploads(drive_id);
 `);
 
 // Migration: make expires_at nullable if the column was created with NOT NULL
@@ -131,6 +144,22 @@ export function listEvents(): Event[] {
 
 export function deleteEvent(id: number): void {
   db.prepare("DELETE FROM events WHERE id = $id").run({ $id: id });
+}
+
+export function recordUpload(
+  eventId: number,
+  driveId: string,
+  fileName: string,
+  uploaderName: string | null,
+): void {
+  db.prepare(
+    "INSERT INTO uploads (event_id, drive_id, file_name, uploader_name) VALUES ($eventId, $driveId, $fileName, $uploaderName)",
+  ).run({
+    $eventId: eventId,
+    $driveId: driveId,
+    $fileName: fileName,
+    $uploaderName: uploaderName,
+  });
 }
 
 export function getPasswordHash(): string | null {

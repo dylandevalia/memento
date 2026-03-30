@@ -111,7 +111,7 @@ export const eventRoutes = {
         expiresAt,
       );
 
-      const uploadUrl = `${getBaseUrl(req)}/upload/${slug}`;
+      const uploadUrl = `${getBaseUrl(req)}/event/${slug}`;
       let qrCodeDataUrl: string;
       try {
         qrCodeDataUrl = await generateQrDataUrl(uploadUrl);
@@ -155,7 +155,7 @@ export const eventRoutes = {
         return Response.json({ error: "Event not found" }, { status: 404 });
       }
       const baseUrl = getBaseUrl(req);
-      const uploadUrl = `${baseUrl}/upload/${event.slug}`;
+      const uploadUrl = `${baseUrl}/event/${event.slug}`;
       try {
         const qrCodeDataUrl = await generateQrDataUrl(uploadUrl);
         return Response.json({ qrCodeDataUrl, uploadUrl });

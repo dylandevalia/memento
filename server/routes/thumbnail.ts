@@ -1,4 +1,4 @@
-import { getThumbnailUrl } from "../lib/drive";
+import { getThumbnailData } from "../lib/drive";
 
 export const thumbnailRoutes = {
   "/api/thumbnail/:driveId": {
@@ -10,28 +10,15 @@ export const thumbnailRoutes = {
         return new Response("Missing driveId", { status: 400 });
       }
       try {
-        const url = await getThumbnailUrl(driveId);
-        if (!url) {
+        const thumbnail = await getThumbnailData(driveId);
+        if (!thumbnail) {
           return new Response("No thumbnail available", { status: 404 });
         }
 
-        // Proxy the image bytes through our server so browsers never hit
-        // Google's CDN directly — this prevents per-IP 429s from the client side.
-        const upstream = await fetch(url);
-        if (!upstream.ok) {
-          return new Response("Upstream fetch failed", {
-            status: upstream.status,
-          });
-        }
-
-        const contentType =
-          upstream.headers.get("content-type") ?? "image/jpeg";
-        const body = await upstream.arrayBuffer();
-
-        return new Response(body, {
+        return new Response(new Uint8Array(thumbnail.data), {
           status: 200,
           headers: {
-            "Content-Type": contentType,
+            "Content-Type": thumbnail.contentType,
             // Clients cache for 24 h; CDN/proxy may cache for the same period
             "Cache-Control": "public, max-age=86400, immutable",
           },

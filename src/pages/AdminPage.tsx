@@ -75,10 +75,11 @@ function Section({
       <Box
         sx={{
           border: "1px solid",
-          borderColor: "rgba(200, 169, 110, 0.1)",
-          borderRadius: 2,
+          borderColor: "rgba(168, 85, 247, 0.15)",
+          borderRadius: 3,
           overflow: "hidden",
           bgcolor: "background.paper",
+          boxShadow: "0 2px 16px rgba(168, 85, 247, 0.07)",
         }}
       >
         {children}
@@ -116,7 +117,7 @@ function SetupStep({
             height: 26,
             borderRadius: "50%",
             border: "1.5px solid",
-            borderColor: done ? "success.main" : "rgba(200, 169, 110, 0.35)",
+            borderColor: done ? "success.main" : "rgba(168, 85, 247, 0.4)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -356,25 +357,26 @@ export default function AdminPage() {
           position: "sticky",
           top: 0,
           zIndex: 10,
-          bgcolor: "background.default",
-          borderBottom: "1px solid",
-          borderColor: "divider",
+          bgcolor: "background.paper",
+          borderBottom: "2px solid",
+          borderColor: "rgba(168, 85, 247, 0.18)",
           px: { xs: 2.5, sm: 4 },
           py: 1.75,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          boxShadow: "0 2px 16px rgba(168, 85, 247, 0.08)",
         }}
       >
         <Box>
           <Typography
+            className="rainbow-text"
             sx={{
-              letterSpacing: "0.35em",
-              color: "primary.main",
-              fontSize: "0.62rem",
-              textTransform: "uppercase",
+              fontFamily: "var(--font-heading)",
+              fontSize: "1.3rem",
+              letterSpacing: "0.04em",
               lineHeight: 1,
-              mb: 0.4,
+              mb: 0.2,
             }}
           >
             Memento
@@ -706,11 +708,16 @@ export default function AdminPage() {
                     border: "1px solid",
                     borderColor: expired
                       ? "rgba(217, 112, 112, 0.15)"
-                      : "rgba(200, 169, 110, 0.1)",
-                    borderRadius: 2,
+                      : "rgba(168, 85, 247, 0.12)",
+                    borderRadius: 3,
                     px: 2.5,
                     py: 2,
                     bgcolor: "background.paper",
+                    transition: "box-shadow 0.2s ease, transform 0.2s ease",
+                    "&:hover": {
+                      boxShadow: "0 4px 20px rgba(168, 85, 247, 0.12)",
+                      transform: "translateY(-2px)",
+                    },
                   }}
                 >
                   <Box
@@ -749,7 +756,7 @@ export default function AdminPage() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        /upload/{event.slug}
+                        /event/{event.slug}
                       </Typography>
                     </Box>
                     <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
@@ -757,7 +764,7 @@ export default function AdminPage() {
                         <span>
                           <IconButton
                             component="a"
-                            href={`/upload/${event.slug}`}
+                            href={`/event/${event.slug}`}
                             target="_blank"
                             rel="noreferrer"
                             size="small"
@@ -886,14 +893,15 @@ export default function AdminPage() {
         <DialogContent>
           {qrDialog && (
             <Stack spacing={2.5} alignItems="center" py={1}>
-              {/* QR code with subtle gold border */}
+              {/* QR code with colourful border */}
               <Box
                 sx={{
                   p: 1.5,
-                  border: "1px solid",
-                  borderColor: "rgba(200, 169, 110, 0.2)",
-                  borderRadius: 2,
+                  border: "2px solid",
+                  borderColor: "rgba(168, 85, 247, 0.3)",
+                  borderRadius: 3,
                   bgcolor: "#fff",
+                  boxShadow: "0 4px 20px rgba(168, 85, 247, 0.15)",
                 }}
               >
                 <Box
