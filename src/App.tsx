@@ -1,64 +1,82 @@
 import { CssBaseline, createTheme, ThemeProvider } from "@mui/material";
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ADMIN_AUTH_KEY } from "./lib/auth";
-import AdminPage from "./pages/AdminPage";
-import LoginPage from "./pages/LoginPage";
-import UploadPage from "./pages/UploadPage";
 
-const GOLD = "#C8A96E";
-const GOLD_LIGHT = "#D9BC88";
-const BG_DEFAULT = "#0D0D10";
-const BG_PAPER = "#15151D";
+// In dev: static/eager imports so Vite Fast Refresh / HMR works correctly.
+// In prod: lazy() so each route is a separate chunk that's only fetched on demand.
+// Vite statically analyses import.meta.env.PROD and tree-shakes the dead branch.
+const AdminPage = import.meta.env.PROD
+  ? lazy(() => import("./pages/AdminPage"))
+  : (await import("./pages/AdminPage")).default;
+
+const LoginPage = import.meta.env.PROD
+  ? lazy(() => import("./pages/LoginPage"))
+  : (await import("./pages/LoginPage")).default;
+
+const EventPage = import.meta.env.PROD
+  ? lazy(() =>
+      import("./pages/EventPage").then((m) => ({
+        default: m.EventPage,
+      })),
+    )
+  : (await import("./pages/EventPage")).EventPage;
+
+// ── Purple-focused palette using Material 3 variables ─────────────────────
+const PRIMARY = "rgb(var(--mui-purple-500))"; // #9c27b0
+const PRIMARY_LIGHT = "rgb(var(--mui-purple-300))"; // #ba68c8
+const PRIMARY_DARK = "rgb(var(--mui-purple-700))"; // #7b1fa2
+const SECONDARY = "rgb(var(--mui-deep-purple-400))"; // #7e57c2
+const SECONDARY_LIGHT = "rgb(var(--mui-deep-purple-200))"; // #b39ddb
+const SECONDARY_DARK = "rgb(var(--mui-deep-purple-600))"; // #5e35b1
+const BG_DEFAULT = "rgb(var(--mui-purple-50))"; // #f3e5f5
+const BG_PAPER = "#FFFFFF";
+const TEXT_PRIMARY = "rgb(var(--mui-purple-900))"; // #4a148c
+const TEXT_SECONDARY = "rgb(var(--mui-purple-400))"; // #ab47bc
+const TEAL = "rgb(var(--mui-teal-500))"; // #009688
+const YELLOW = "rgb(var(--mui-yellow-700))"; // #fbc02d
+const ERROR = "rgb(var(--mui-red-500))"; // #f44336
 
 const theme = createTheme({
   palette: {
-    mode: "dark",
+    mode: "light",
     primary: {
-      main: GOLD,
-      light: GOLD_LIGHT,
-      dark: "#A8894E",
-      contrastText: "#0D0D10",
+      main: PRIMARY,
+      light: PRIMARY_LIGHT,
+      dark: PRIMARY_DARK,
+      contrastText: "#FFFFFF",
+    },
+    secondary: {
+      main: SECONDARY,
+      light: SECONDARY_LIGHT,
+      dark: SECONDARY_DARK,
+      contrastText: "#FFFFFF",
     },
     background: {
       default: BG_DEFAULT,
       paper: BG_PAPER,
     },
     text: {
-      primary: "#EDE8E1",
-      secondary: "#7A7480",
+      primary: TEXT_PRIMARY,
+      secondary: TEXT_SECONDARY,
     },
-    divider: "rgba(200, 169, 110, 0.12)",
-    error: { main: "#D97070" },
-    success: { main: "#78A99A" },
+    divider: "rgba(var(--mui-purple-500), 0.18)",
+    error: { main: ERROR },
+    success: { main: TEAL },
+    warning: { main: YELLOW },
   },
   typography: {
-    fontFamily: '"Roboto", system-ui, sans-serif',
-    h1: {
-      fontFamily: '"Playfair Display", Georgia, serif',
-      fontWeight: 400,
-    },
-    h2: {
-      fontFamily: '"Playfair Display", Georgia, serif',
-      fontWeight: 400,
-    },
-    h3: {
-      fontFamily: '"Playfair Display", Georgia, serif',
-      fontWeight: 400,
-    },
-    h4: {
-      fontFamily: '"Playfair Display", Georgia, serif',
-      fontWeight: 400,
-    },
-    h5: {
-      fontFamily: '"Playfair Display", Georgia, serif',
-      fontWeight: 400,
-    },
-    h6: {
-      fontFamily: '"Playfair Display", Georgia, serif',
-      fontWeight: 400,
-    },
+    fontFamily: "var(--font-body)",
+    h1: { fontFamily: "var(--font-heading)", fontWeight: 700 },
+    h2: { fontFamily: "var(--font-heading)", fontWeight: 700 },
+    h3: { fontFamily: "var(--font-heading)", fontWeight: 700 },
+    h4: { fontFamily: "var(--font-heading)", fontWeight: 700 },
+    h5: { fontFamily: "var(--font-heading)", fontWeight: 700 },
+    h6: { fontFamily: "var(--font-heading)", fontWeight: 700 },
+    button: { fontWeight: 700 },
   },
-  shape: { borderRadius: 4 },
+  shape: { borderRadius: 16 },
   components: {
     MuiCssBaseline: {
       styleOverrides: {
@@ -72,38 +90,58 @@ const theme = createTheme({
         root: {
           textTransform: "none",
           borderRadius: "100px",
-          letterSpacing: "0.07em",
-          fontWeight: 500,
-          fontSize: "0.875rem",
+          fontWeight: 700,
+          fontSize: "0.95rem",
+          letterSpacing: "0.02em",
+          transition:
+            "transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease",
+          "&:hover": {
+            transform: "scale(1.06) translateY(-1px)",
+          },
+          "&:active": {
+            transform: "scale(0.96)",
+          },
         },
         sizeLarge: {
-          padding: "13px 32px",
+          padding: "13px 36px",
+          fontSize: "1rem",
         },
         containedPrimary: {
-          background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 100%)`,
-          color: "#0D0D10",
-          boxShadow: "0 4px 20px rgba(200, 169, 110, 0.28)",
+          background: `linear-gradient(135deg, ${PRIMARY_LIGHT} 0%, ${PRIMARY} 50%, ${PRIMARY_DARK} 100%)`,
+          backgroundSize: "200% 200%",
+          color: "#FFFFFF",
+          boxShadow: `0 4px 20px rgba(var(--mui-purple-500), 0.4)`,
           "&:hover": {
-            background: `linear-gradient(135deg, #E2C994 0%, ${GOLD_LIGHT} 100%)`,
-            boxShadow: "0 6px 28px rgba(200, 169, 110, 0.38)",
+            boxShadow: `0 8px 30px rgba(var(--mui-purple-500), 0.55)`,
+            backgroundPosition: "right center",
           },
           "&.Mui-disabled": {
-            background: "rgba(200, 169, 110, 0.15)",
-            color: "rgba(200, 169, 110, 0.35)",
+            background: "rgba(var(--mui-purple-500), 0.15)",
+            color: "rgba(var(--mui-purple-500), 0.4)",
+          },
+        },
+        containedSecondary: {
+          background: `linear-gradient(135deg, ${SECONDARY_LIGHT} 0%, ${SECONDARY} 100%)`,
+          color: "#FFFFFF",
+          boxShadow: `0 4px 20px rgba(var(--mui-deep-purple-500), 0.4)`,
+          "&:hover": {
+            boxShadow: `0 8px 30px rgba(var(--mui-deep-purple-500), 0.55)`,
           },
         },
         outlinedPrimary: {
-          borderColor: "rgba(200, 169, 110, 0.4)",
-          color: GOLD,
+          borderColor: PRIMARY,
+          borderWidth: "2px",
+          color: PRIMARY,
           "&:hover": {
-            borderColor: GOLD,
-            backgroundColor: "rgba(200, 169, 110, 0.07)",
+            borderWidth: "2px",
+            borderColor: PRIMARY,
+            backgroundColor: "rgba(var(--mui-purple-500), 0.08)",
           },
         },
         textPrimary: {
-          color: GOLD,
+          color: PRIMARY,
           "&:hover": {
-            backgroundColor: "rgba(200, 169, 110, 0.07)",
+            backgroundColor: "rgba(var(--mui-purple-500), 0.08)",
           },
         },
       },
@@ -113,20 +151,26 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           "& .MuiOutlinedInput-root": {
-            borderRadius: "10px",
+            borderRadius: "16px",
+            backgroundColor: "rgba(var(--mui-purple-50), 0.5)",
+            transition: "box-shadow 0.2s ease",
             "& fieldset": {
-              borderColor: "rgba(200, 169, 110, 0.18)",
+              borderColor: "rgba(var(--mui-purple-500), 0.25)",
+              borderWidth: "2px",
             },
             "&:hover fieldset": {
-              borderColor: "rgba(200, 169, 110, 0.38)",
+              borderColor: PRIMARY,
+            },
+            "&.Mui-focused": {
+              boxShadow: `0 0 0 3px rgba(var(--mui-purple-500), 0.15)`,
             },
             "&.Mui-focused fieldset": {
-              borderColor: GOLD,
-              borderWidth: "1px",
+              borderColor: PRIMARY,
+              borderWidth: "2px",
             },
           },
           "& .MuiInputLabel-root.Mui-focused": {
-            color: GOLD,
+            color: PRIMARY,
           },
         },
       },
@@ -135,64 +179,84 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 100,
-          height: 2,
-          backgroundColor: "rgba(200, 169, 110, 0.1)",
+          height: 8,
+          backgroundColor: "rgba(var(--mui-purple-500), 0.12)",
+          overflow: "hidden",
         },
         bar: {
-          background: `linear-gradient(90deg, ${GOLD}, ${GOLD_LIGHT})`,
+          background: `linear-gradient(90deg, ${PRIMARY_LIGHT}, ${PRIMARY}, ${SECONDARY}, ${PRIMARY_DARK}, ${PRIMARY_LIGHT})`,
+          backgroundSize: "300% 100%",
+          animation: "shimmer 2s linear infinite",
+          borderRadius: 100,
         },
       },
     },
     MuiCircularProgress: {
       defaultProps: { color: "primary" },
+      styleOverrides: {
+        root: {
+          filter: "drop-shadow(0 0 4px rgba(var(--mui-purple-500), 0.5))",
+        },
+        circle: {
+          strokeLinecap: "round",
+        },
+      },
     },
     MuiAlert: {
       styleOverrides: {
         root: {
-          borderRadius: "10px",
-          fontSize: "0.85rem",
+          borderRadius: "16px",
+          fontSize: "0.9rem",
+          fontWeight: 600,
+          border: "2px solid transparent",
         },
         standardError: {
-          backgroundColor: "rgba(217, 112, 112, 0.1)",
-          color: "#D97070",
-          border: "1px solid rgba(217, 112, 112, 0.2)",
-          "& .MuiAlert-icon": { color: "#D97070" },
+          backgroundColor: "rgba(var(--mui-red-500), 0.1)",
+          color: "rgb(var(--mui-red-900))",
+          border: "2px solid rgba(var(--mui-red-500), 0.3)",
+          "& .MuiAlert-icon": { color: ERROR },
         },
         standardSuccess: {
-          backgroundColor: "rgba(120, 169, 154, 0.1)",
-          color: "#78A99A",
-          border: "1px solid rgba(120, 169, 154, 0.2)",
-          "& .MuiAlert-icon": { color: "#78A99A" },
+          backgroundColor: "rgba(var(--mui-teal-500), 0.1)",
+          color: "rgb(var(--mui-teal-900))",
+          border: `2px solid rgba(var(--mui-teal-500), 0.3)`,
+          "& .MuiAlert-icon": { color: TEAL },
         },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          backgroundImage: "none",
-          backgroundColor: BG_PAPER,
-          border: "1px solid rgba(200, 169, 110, 0.1)",
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          backgroundImage: "none",
+        standardWarning: {
+          backgroundColor: "rgba(var(--mui-yellow-700), 0.1)",
+          color: "rgb(var(--mui-yellow-900))",
+          border: "2px solid rgba(var(--mui-yellow-700), 0.3)",
+          "& .MuiAlert-icon": { color: YELLOW },
         },
       },
     },
     MuiDivider: {
       styleOverrides: {
         root: {
-          borderColor: "rgba(200, 169, 110, 0.12)",
+          borderColor: "rgba(var(--mui-purple-500), 0.18)",
+          borderStyle: "dashed",
         },
       },
     },
     MuiIconButton: {
       styleOverrides: {
         root: {
+          borderRadius: "14px",
+          transition:
+            "transform 0.15s cubic-bezier(0.34,1.56,0.64,1), background-color 0.15s ease",
+          "&:hover": {
+            transform: "scale(1.15) rotate(-5deg)",
+          },
+        },
+      },
+    },
+    MuiTooltip: {
+      styleOverrides: {
+        tooltip: {
           borderRadius: "10px",
+          fontWeight: 600,
+          fontSize: "0.78rem",
+          backgroundColor: TEXT_PRIMARY,
         },
       },
     },
@@ -210,20 +274,24 @@ export function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<Navigate to="/admin" replace />} />
-        <Route
-          path="/admin"
-          element={
-            <RequireAuth>
-              <AdminPage />
-            </RequireAuth>
-          }
-        />
-        <Route path="/upload/:slug" element={<UploadPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <ErrorBoundary>
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<Navigate to="/admin" replace />} />
+            <Route
+              path="/admin"
+              element={
+                <RequireAuth>
+                  <AdminPage />
+                </RequireAuth>
+              }
+            />
+            <Route path="/event/:slug" element={<EventPage />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }
