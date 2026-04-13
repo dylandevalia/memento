@@ -1,216 +1,28 @@
-.uploadPage {
-  min-height: 100dvh;
-  background-color: rgb(var(--mui-grey-100));
-  position: relative;
-  overflow: hidden;
-
+.section {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 1.5rem;
-  padding: 2rem;
+  gap: 1rem;
 
-  /* Floating blob layers - optimized */
-  &::before,
-  &::after {
-    content: "";
-    position: fixed; /* Better performance than absolute */
-    inset: 0;
-    width: 100vw;
-    height: 100vh;
-    pointer-events: none;
-    z-index: 0;
-    will-change: transform; /* GPU compositing hint */
-    animation-composition: add;
-  }
-
-  &::before {
-    background:
-      radial-gradient(
-        ellipse 50vw 45vh at 20% 30%,
-        rgb(var(--mui-purple-400) / 65%),
-        transparent 55%
-      ),
-      radial-gradient(
-        ellipse 55vw 50vh at 75% 65%,
-        rgb(var(--mui-red-500) / 60%),
-        transparent 55%
-      ),
-      radial-gradient(
-        ellipse 40vw 40vh at 50% 85%,
-        rgb(var(--mui-blue-300) / 55%),
-        transparent 55%
-      );
-    filter: blur(60px);
-    animation:
-      float-blob-a 25s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
-      float-blob-c 32s cubic-bezier(0.42, 0, 0.58, 1) infinite 5s;
-  }
-
-  &::after {
-    background:
-      radial-gradient(
-        ellipse 45vw 40vh at 80% 20%,
-        rgb(var(--mui-cyan-200) / 50%),
-        transparent 55%
-      ),
-      radial-gradient(
-        ellipse 35vw 40vh at 15% 70%,
-        rgb(var(--mui-orange-300) / 45%),
-        transparent 55%
-      );
-    filter: blur(70px);
-    animation:
-      float-blob-b 30s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite 8s,
-      float-blob-d 28s cubic-bezier(0.42, 0, 0.58, 1) infinite 3s;
-  }
-
-  /* Ensure content sits above blobs */
-  > * {
-    position: relative;
-    z-index: 1;
-  }
-
-  main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-
-    width: 100%;
-    max-width: 600px;
-  }
-
-  h1 {
-    font-family: var(--font-heading);
-    font-size: 2.5rem;
-    background: linear-gradient(
-      135deg,
-      rgb(var(--mui-purple-400)),
-      rgb(var(--mui-deep-purple-500)),
-      rgb(var(--mui-pink-600))
-    );
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-size: 200% 200%;
-    animation: rainbow-gradient 4s ease infinite;
-    margin: 0;
-    text-align: center;
-  }
+  width: 100%;
+  max-width: 600px;
 }
 
-/* Lava lamp style animations */
-@keyframes float-blob-a {
-  0% {
-    transform: translate(0%, 0%) scale(1) rotate(0deg);
-  }
-  14% {
-    transform: translate(15%, -12%) scale(1.05) rotate(3deg);
-  }
-  28% {
-    transform: translate(8%, 18%) scale(0.95) rotate(-2deg);
-  }
-  42% {
-    transform: translate(-18%, 10%) scale(1.08) rotate(5deg);
-  }
-  56% {
-    transform: translate(-10%, -15%) scale(0.92) rotate(-4deg);
-  }
-  70% {
-    transform: translate(20%, -8%) scale(1.06) rotate(2deg);
-  }
-  84% {
-    transform: translate(12%, 20%) scale(0.98) rotate(-3deg);
-  }
-  100% {
-    transform: translate(0%, 0%) scale(1) rotate(0deg);
-  }
-}
-
-@keyframes float-blob-b {
-  0% {
-    transform: translate(0%, 0%) scale(1) rotate(0deg);
-  }
-  12% {
-    transform: translate(-15%, 18%) scale(0.96) rotate(-5deg);
-  }
-  25% {
-    transform: translate(22%, 12%) scale(1.09) rotate(6deg);
-  }
-  37% {
-    transform: translate(10%, -20%) scale(0.94) rotate(-3deg);
-  }
-  50% {
-    transform: translate(-20%, -10%) scale(1.07) rotate(4deg);
-  }
-  62% {
-    transform: translate(-12%, 22%) scale(0.97) rotate(-6deg);
-  }
-  75% {
-    transform: translate(18%, -15%) scale(1.04) rotate(3deg);
-  }
-  87% {
-    transform: translate(-16%, -18%) scale(0.99) rotate(-2deg);
-  }
-  100% {
-    transform: translate(0%, 0%) scale(1) rotate(0deg);
-  }
-}
-
-@keyframes float-blob-c {
-  0% {
-    transform: translate(0%, 0%) scale(1) rotate(0deg);
-  }
-  16% {
-    transform: translate(-12%, -16%) scale(1.03) rotate(-4deg);
-  }
-  32% {
-    transform: translate(18%, 8%) scale(0.97) rotate(3deg);
-  }
-  48% {
-    transform: translate(-8%, 20%) scale(1.06) rotate(-2deg);
-  }
-  64% {
-    transform: translate(14%, -14%) scale(0.94) rotate(5deg);
-  }
-  80% {
-    transform: translate(-18%, 6%) scale(1.04) rotate(-3deg);
-  }
-  100% {
-    transform: translate(0%, 0%) scale(1) rotate(0deg);
-  }
-}
-
-@keyframes float-blob-d {
-  0% {
-    transform: translate(0%, 0%) scale(1) rotate(0deg);
-  }
-  20% {
-    transform: translate(16%, 14%) scale(0.98) rotate(4deg);
-  }
-  40% {
-    transform: translate(-14%, -18%) scale(1.05) rotate(-5deg);
-  }
-  60% {
-    transform: translate(10%, -10%) scale(0.96) rotate(2deg);
-  }
-  80% {
-    transform: translate(-20%, 16%) scale(1.08) rotate(-3deg);
-  }
-  100% {
-    transform: translate(0%, 0%) scale(1) rotate(0deg);
-  }
-}
-
-@keyframes rainbow-gradient {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
+.name {
+  font-family: var(--font-heading);
+  font-size: 2.5rem;
+  background: linear-gradient(
+    135deg,
+    rgb(var(--mui-purple-400)),
+    rgb(var(--mui-deep-purple-500)),
+    rgb(var(--mui-pink-600))
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 200%;
+  animation: rainbow-gradient 4s ease infinite;
+  margin: 0;
+  text-align: center;
 }

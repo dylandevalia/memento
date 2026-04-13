@@ -1,0 +1,104 @@
+.pageBackground {
+  min-height: 100dvh;
+  background-color: rgb(var(--mui-grey-100));
+  /* background-color: red; */
+  position: relative;
+  overflow: hidden;
+
+  width: 100%;
+}
+
+.circlesContainer {
+  filter: blur(48px);
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 50%;
+  contain: layout style paint; /* Optimize rendering isolation */
+}
+
+.circle {
+  --size: 300px;
+  --color: rgb(var(--mui-purple-400));
+
+  --fade-duration: 30s;
+  --fade-delay: 0s;
+
+  --scale-from: 0.1;
+  --scale-to: 1;
+  --scale-duration: 30s;
+  --scale-delay: 0s;
+
+  --slide-from-x: 0vw;
+  --slide-from-y: 0vh;
+  --slide-to-x: 100vw;
+  --slide-to-y: 100vh;
+  --slide-duration: 5s;
+  --slide-delay: 0s;
+
+  --_x-start: calc(var(--slide-from-x) - var(--size) / 2);
+  --_y-start: calc(var(--slide-from-y) - var(--size) / 2);
+  --_x-end: calc(var(--slide-to-x) - var(--size) / 2);
+  --_y-end: calc(var(--slide-to-y) - var(--size) / 2);
+
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.33;
+  width: var(--size);
+  aspect-ratio: 1 / 1;
+  background-color: var(--color);
+
+  /* Force single compositing layer via parent blur instead of individual layers */
+  animation-composition: add;
+  animation:
+    fade var(--scale-duration) ease-in-out infinite alternate backwards
+    var(--fade-delay),
+    scale var(--scale-duration) ease-in-out infinite alternate backwards
+    var(--scale-delay),
+    slide var(--slide-duration) ease-in-out infinite alternate backwards
+    var(--slide-delay);
+}
+
+.contentContainer {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 2rem;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.5;
+  }
+}
+
+@keyframes scale {
+  from {
+    transform: scale(var(--scale-from));
+  }
+  to {
+    transform: scale(var(--scale-to));
+  }
+}
+
+@keyframes slide {
+  from {
+    transform: translate(var(--_x-start), var(--_y-start));
+  }
+  to {
+    transform: translate(var(--_x-end), var(--_y-end));
+  }
+}

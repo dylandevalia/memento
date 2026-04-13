@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Contributions } from "@/components/contributions";
 import { FileUpload } from "@/components/file-upload";
+import { PageBackground } from "@/components/page-background";
 import { PageHeader } from "@/components/page-header";
 import { QrModal } from "@/components/qr-modal";
 import { api } from "@/lib/api";
@@ -46,46 +47,49 @@ export function EventPage() {
     validateSlug(slug);
   }, [slug]);
 
-  if (eventValid === null) {
-    return (
-      <article className={styles.uploadPage}>
-        <PageHeader />
-        <main>
+  const renderContent = useCallback(() => {
+    if (eventValid === null) {
+      return (
+        <section className={styles.section}>
           <CircularProgress />
           <p>Loading event data...</p>
-        </main>
-      </article>
-    );
-  } else if (!slug || eventValid === false || !eventInfo) {
-    return (
-      <article className={styles.uploadPage}>
-        <PageHeader />
-
-        <main>
+        </section>
+      );
+    } else if (!slug || eventValid === false || !eventInfo) {
+      return (
+        <section className={styles.section}>
           <p>Invalid or expired event link</p>
-        </main>
-      </article>
+        </section>
+      );
+    }
+
+    return (
+      <>
+        <h1 className={styles.name}>{eventInfo.name.toLocaleLowerCase()}</h1>
+
+        <section
+          style={{ flex: 1, maxWidth: "800px", width: "100%" }}
+          className={styles.section}
+        >
+          <FileUpload slug={slug} handleOpenQr={handleOpenQr} />
+
+          <Contributions slug={slug} />
+        </section>
+
+        <QrModal
+          open={qrOpen}
+          onClose={() => setQrOpen(false)}
+          slug={slug}
+          eventName={eventInfo.name}
+        />
+      </>
     );
-  }
+  }, [eventInfo, eventValid, handleOpenQr, slug, qrOpen]);
 
   return (
-    <article className={styles.uploadPage}>
+    <PageBackground>
       <PageHeader handleOpenQr={handleOpenQr} />
-
-      <h1>{eventInfo.name.toLocaleLowerCase()}</h1>
-
-      <main>
-        <FileUpload slug={slug} handleOpenQr={handleOpenQr} />
-
-        <Contributions slug={slug} />
-      </main>
-
-      <QrModal
-        open={qrOpen}
-        onClose={() => setQrOpen(false)}
-        slug={slug}
-        eventName={eventInfo.name}
-      />
-    </article>
+      {renderContent()}
+    </PageBackground>
   );
 }
