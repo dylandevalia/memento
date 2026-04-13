@@ -49,10 +49,16 @@ export function QrModal({ open, onClose, slug, eventName }: QrModalProps) {
   const handleShare = useCallback(() => {
     if (!qrData || !navigator.share) return;
 
+    const shareText = eventName
+      ? `📸 Share your photos and videos from ${eventName}! Tap the link below to upload:`
+      : "📸 Share your photos and videos with us! Tap the link below to upload:";
+
     navigator
       .share({
-        title: eventName || "Memento Upload",
-        text: "Scan the QR code or use the link to upload your files:",
+        title: eventName
+          ? `${eventName} - Upload Photos`
+          : "Upload Your Photos",
+        text: shareText,
         url: qrData.uploadUrl,
       })
       .catch((error) => {
