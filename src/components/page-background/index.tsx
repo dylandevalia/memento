@@ -3,7 +3,6 @@ import { getRandomColor } from "@/utils/material3";
 import { getRandomInt } from "@/utils/random";
 import styles from "./styles.module.css";
 
-const windowMin = Math.min(window.innerWidth, window.innerHeight);
 const windowMax = Math.max(window.innerWidth, window.innerHeight);
 
 const CIRCLE_COUNT = Math.floor(windowMax / 50); // More circles for larger screens

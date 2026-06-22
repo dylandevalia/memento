@@ -7,12 +7,22 @@ import type {
   UploadResponse,
   ValidateTokenResponse,
 } from "../types";
+import { STORAGE_KEYS } from "./constants";
 
 const BASE = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const sessionToken = sessionStorage.getItem(STORAGE_KEYS.ADMIN_AUTH);
+  const authHeaders: Record<string, string> = sessionToken
+    ? { Authorization: `Bearer ${sessionToken}` }
+    : {};
+
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+      ...init?.headers,
+    },
     ...init,
   });
   if (!res.ok) {
@@ -28,10 +38,12 @@ export const api = {
     status: () => request<{ hasPassword: boolean }>("/auth/status"),
 
     login: (password: string) =>
-      request<{ ok: boolean }>("/auth/login", {
+      request<{ ok: boolean; sessionToken: string }>("/auth/login", {
         method: "POST",
         body: JSON.stringify({ password }),
       }),
+
+    logout: () => request<void>("/auth/logout", { method: "POST" }),
 
     changePassword: (currentPassword: string, newPassword: string) =>
       request<{ ok: boolean }>("/auth/change-password", {
@@ -40,7 +52,7 @@ export const api = {
       }),
 
     setInitialPassword: (newPassword: string) =>
-      request<{ ok: boolean }>("/auth/change-password", {
+      request<{ ok: boolean; sessionToken: string }>("/auth/change-password", {
         method: "POST",
         body: JSON.stringify({ newPassword }),
       }),
@@ -82,8 +94,8 @@ export const api = {
     delete: (id: number) =>
       request<void>(`/events/${id}`, { method: "DELETE" }),
 
-    validate: (token: string) =>
-      request<ValidateTokenResponse>(`/events/${token}/validate`),
+    validate: (slug: string) =>
+      request<ValidateTokenResponse>(`/events/${slug}/validate`),
 
     qr: (slug: string) =>
       request<{ qrCodeDataUrl: string; uploadUrl: string }>(
@@ -97,10 +109,10 @@ export const api = {
     deleteFile: (slug: string, driveId: string) =>
       request<void>(`/upload/${slug}/${driveId}`, { method: "DELETE" }),
 
-    files: async (token: string, files: File[]) => {
+    files: async (slug: string, files: File[]) => {
       const form = new FormData();
       for (const file of files) form.append("files", file);
-      const res = await fetch(`/api/upload/${token}`, {
+      const res = await fetch(`/api/upload/${slug}`, {
         method: "POST",
         body: form,
       });
@@ -112,7 +124,7 @@ export const api = {
     },
 
     uploadFileWithProgress: (
-      token: string,
+      slug: string,
       file: File,
       onProgress: (loaded: number, total: number) => void,
     ): Promise<UploadResponse> =>
@@ -127,12 +139,14 @@ export const api = {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve(JSON.parse(xhr.responseText) as UploadResponse);
           } else {
-            const err = JSON.parse(xhr.responseText) as { error?: string };
+            const err = JSON.parse(xhr.responseText) as {
+              error?: string;
+            };
             reject(new Error(err.error ?? xhr.statusText));
           }
         };
         xhr.onerror = () => reject(new Error("Network error"));
-        xhr.open("POST", `/api/upload/${token}`);
+        xhr.open("POST", `/api/upload/${slug}`);
         xhr.send(form);
       }),
   },

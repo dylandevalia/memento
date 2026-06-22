@@ -10,7 +10,7 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import { ADMIN_AUTH_KEY } from "../lib/auth";
+import { ADMIN_AUTH_KEY, setSessionToken } from "../lib/auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -45,8 +45,8 @@ export default function LoginPage() {
       }
       setLoading(true);
       try {
-        await api.auth.setInitialPassword(password);
-        sessionStorage.setItem(ADMIN_AUTH_KEY, "1");
+        const result = await api.auth.setInitialPassword(password);
+        setSessionToken(result.sessionToken);
         navigate("/admin", { replace: true });
       } catch (err) {
         setError((err as Error).message);
@@ -57,8 +57,8 @@ export default function LoginPage() {
       // Normal login
       setLoading(true);
       try {
-        await api.auth.login(password);
-        sessionStorage.setItem(ADMIN_AUTH_KEY, "1");
+        const result = await api.auth.login(password);
+        setSessionToken(result.sessionToken);
         navigate("/admin", { replace: true });
       } catch (err) {
         setError((err as Error).message);
@@ -102,7 +102,7 @@ export default function LoginPage() {
       <Typography
         className="rainbow-text"
         sx={{
-          fontFamily: 'var(--font-heading)',
+          fontFamily: "var(--font-heading)",
           fontSize: "2rem",
           letterSpacing: "0.06em",
           mb: 4,
@@ -141,7 +141,12 @@ export default function LoginPage() {
         <Typography
           variant="body2"
           color="text.secondary"
-          sx={{ textAlign: "center", maxWidth: 280, mb: 1, lineHeight: 1.7 }}
+          sx={{
+            textAlign: "center",
+            maxWidth: 280,
+            mb: 1,
+            lineHeight: 1.7,
+          }}
         >
           Create a password to protect the admin portal.
         </Typography>

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { serve } from "bun";
+import { requireAuth } from "./lib/session";
 import { authRoutes } from "./routes/auth";
 import { configRoutes } from "./routes/config";
 import { eventRoutes } from "./routes/events";
@@ -13,7 +14,7 @@ const distDir = path.join(import.meta.dir, "../dist");
 const corsHeaders = {
   "Access-Control-Allow-Origin": isDev ? "http://localhost:3000" : "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 function withCors(res: Response): Response {
@@ -54,6 +55,11 @@ const server = serve({
         return withCors(await authRoutes["/api/auth/login"].POST(req));
     }
 
+    if (pathname === "/api/auth/logout") {
+      if (method === "POST")
+        return withCors(authRoutes["/api/auth/logout"].POST(req));
+    }
+
     if (pathname === "/api/auth/change-password") {
       if (method === "POST")
         return withCors(
@@ -70,50 +76,61 @@ const server = serve({
     if (pathname === "/api/config/google") {
       if (method === "GET")
         return withCors(await configRoutes["/api/config/google"].GET(req));
-      if (method === "POST")
+      if (method === "POST") {
+        const authErr = requireAuth(req);
+        if (authErr) return withCors(authErr);
         return withCors(await configRoutes["/api/config/google"].POST(req));
+      }
     }
 
     if (pathname === "/api/config/google-auth") {
-      if (method === "POST")
+      if (method === "POST") {
+        const authErr = requireAuth(req);
+        if (authErr) return withCors(authErr);
         return withCors(
           await configRoutes["/api/config/google-auth"].POST(req),
         );
+      }
     }
 
     if (pathname === "/api/config/folder") {
-      if (method === "POST")
+      if (method === "POST") {
+        const authErr = requireAuth(req);
+        if (authErr) return withCors(authErr);
         return withCors(await configRoutes["/api/config/folder"].POST(req));
+      }
     }
 
     // ── Event routes ─────────────────────────────────────────────────
     if (pathname === "/api/events") {
+      const authErr = requireAuth(req);
+      if (authErr) return withCors(authErr);
       if (method === "GET")
         return withCors(await eventRoutes["/api/events"].GET(req));
       if (method === "POST")
         return withCors(await eventRoutes["/api/events"].POST(req));
     }
 
-    // /api/events/:token/qr  (must come before /:id)
+    // /api/events/:slug/qr  (must come before /:id)
     const qrMatch = pathname.match(/^\/api\/events\/([^/]+)\/qr$/);
     if (qrMatch) {
-      const token = qrMatch[1] ?? "";
+      const slug = qrMatch[1] ?? "";
       if (method === "GET")
         return withCors(
-          await eventRoutes["/api/events/:token/qr"].GET(
-            addParams(req, { token }),
+          await eventRoutes["/api/events/:slug/qr"].GET(
+            addParams(req, { slug }),
           ),
         );
     }
 
-    // /api/events/:token/validate  (must come before /:id)
+    // /api/events/:slug/validate
     const validateMatch = pathname.match(/^\/api\/events\/([^/]+)\/validate$/);
     if (validateMatch) {
-      const token = validateMatch[1] ?? "";
+      const slug = validateMatch[1] ?? "";
       if (method === "GET")
         return withCors(
-          await eventRoutes["/api/events/:token/validate"].GET(
-            addParams(req, { token }),
+          await eventRoutes["/api/events/:slug/validate"].GET(
+            addParams(req, { slug }),
           ),
         );
     }
@@ -122,20 +139,23 @@ const server = serve({
     const eventIdMatch = pathname.match(/^\/api\/events\/(\d+)$/);
     if (eventIdMatch) {
       const id = eventIdMatch[1] ?? "";
-      if (method === "DELETE")
+      if (method === "DELETE") {
+        const authErr = requireAuth(req);
+        if (authErr) return withCors(authErr);
         return withCors(
           await eventRoutes["/api/events/:id"].DELETE(addParams(req, { id })),
         );
+      }
     }
 
     // ── Upload routes ────────────────────────────────────────────────
     const uploadMatch = pathname.match(/^\/api\/upload\/([^/]+)$/);
     if (uploadMatch) {
-      const token = uploadMatch[1] ?? "";
+      const slug = uploadMatch[1] ?? "";
       if (method === "POST")
         return withCors(
-          await uploadRoutes["/api/upload/:token"].POST(
-            addParams(req, { token }),
+          await uploadRoutes["/api/upload/:slug"].POST(
+            addParams(req, { slug }),
           ),
         );
     }

@@ -143,6 +143,7 @@
       font-weight: 600;
     }
 
+    /* biome-ignore lint/style/noDescendingSpecificity: selectors target mutually exclusive subtrees */
     p {
       font-family: var(--font-body);
       font-size: 0.9rem;

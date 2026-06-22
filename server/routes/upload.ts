@@ -8,7 +8,7 @@ import {
 } from "../lib/rateLimit";
 
 export const uploadRoutes = {
-  "/api/upload/:token": {
+  "/api/upload/:slug": {
     async POST(
       req: Request & { params: Record<string, string> },
     ): Promise<Response> {
@@ -29,11 +29,11 @@ export const uploadRoutes = {
         // Continue with upload if rate limit check fails
       }
 
-      const token = req.params.token;
-      if (!token) {
+      const slug = req.params.slug;
+      if (!slug) {
         return Response.json({ error: "Missing slug" }, { status: 400 });
       }
-      const event = getEventBySlug(token);
+      const event = getEventBySlug(slug);
       if (!event) {
         return Response.json({ error: "Event not found" }, { status: 404 });
       }
@@ -92,13 +92,18 @@ export const uploadRoutes = {
           // Record the upload in the database
           recordUpload(event.id, driveId, file.name, uploaderName);
         } catch (err) {
-          failed.push({ name: file.name, error: (err as Error).message });
+          failed.push({
+            name: file.name,
+            error: (err as Error).message,
+          });
         }
       }
 
       if (uploaded.length === 0) {
         return Response.json(
-          { error: `All uploads failed. First error: ${failed[0]?.error}` },
+          {
+            error: `All uploads failed. First error: ${failed[0]?.error}`,
+          },
           { status: 502 },
         );
       }

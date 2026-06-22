@@ -264,7 +264,7 @@ const theme = createTheme({
 });
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "1") {
+  if (!sessionStorage.getItem(ADMIN_AUTH_KEY)) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;

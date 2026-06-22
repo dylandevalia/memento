@@ -98,7 +98,9 @@ export const eventRoutes = {
         driveFolderId = await createDriveFolder(body.name.trim(), rootFolderId);
       } catch (err) {
         return Response.json(
-          { error: `Failed to create Drive folder: ${(err as Error).message}` },
+          {
+            error: `Failed to create Drive folder: ${(err as Error).message}`,
+          },
           { status: 502 },
         );
       }
@@ -117,12 +119,18 @@ export const eventRoutes = {
         qrCodeDataUrl = await generateQrDataUrl(uploadUrl);
       } catch (err) {
         return Response.json(
-          { error: `Failed to generate QR code: ${(err as Error).message}` },
+          {
+            error: `Failed to generate QR code: ${(err as Error).message}`,
+          },
           { status: 500 },
         );
       }
 
-      const response: CreateEventResponse = { event, qrCodeDataUrl, uploadUrl };
+      const response: CreateEventResponse = {
+        event,
+        qrCodeDataUrl,
+        uploadUrl,
+      };
       return Response.json(response, { status: 201 });
     },
   },
@@ -141,16 +149,16 @@ export const eventRoutes = {
     },
   },
 
-  "/api/events/:token/qr": {
+  "/api/events/:slug/qr": {
     /** Return a QR code data URL for the event's upload page */
     async GET(
       req: Request & { params: Record<string, string> },
     ): Promise<Response> {
-      const token = req.params.token;
-      if (!token) {
+      const slug = req.params.slug;
+      if (!slug) {
         return Response.json({ error: "Missing slug" }, { status: 400 });
       }
-      const event = getEventBySlug(token);
+      const event = getEventBySlug(slug);
       if (!event) {
         return Response.json({ error: "Event not found" }, { status: 404 });
       }
@@ -168,16 +176,16 @@ export const eventRoutes = {
     },
   },
 
-  "/api/events/:token/validate": {
+  "/api/events/:slug/validate": {
     /** Validate an event by its slug */
     async GET(
       req: Request & { params: Record<string, string> },
     ): Promise<Response> {
-      const token = req.params.token;
-      if (!token) {
+      const slug = req.params.slug;
+      if (!slug) {
         return Response.json({ error: "Missing slug" }, { status: 400 });
       }
-      const event = getEventBySlug(token);
+      const event = getEventBySlug(slug);
       if (!event) {
         const body: ValidateTokenResponse = {
           valid: false,
@@ -194,7 +202,11 @@ export const eventRoutes = {
       }
       const body: ValidateTokenResponse = {
         valid: true,
-        event: { id: event.id, name: event.name, expiresAt: event.expiresAt },
+        event: {
+          id: event.id,
+          name: event.name,
+          expiresAt: event.expiresAt,
+        },
       };
       return Response.json(body);
     },

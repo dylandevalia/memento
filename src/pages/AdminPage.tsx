@@ -27,7 +27,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGooglePicker } from "../hooks/useGooglePicker";
 import { api } from "../lib/api";
-import { ADMIN_AUTH_KEY } from "../lib/auth";
+import { clearSessionToken } from "../lib/auth";
 import type {
   CreateEventResponse,
   DriveConfig,
@@ -312,8 +312,13 @@ export default function AdminPage() {
     }
   }
 
-  function handleLogout() {
-    sessionStorage.removeItem(ADMIN_AUTH_KEY);
+  async function handleLogout() {
+    try {
+      await api.auth.logout();
+    } catch {
+      // best-effort — clear the local session regardless
+    }
+    clearSessionToken();
     navigate("/login", { replace: true });
   }
 
@@ -416,7 +421,13 @@ export default function AdminPage() {
       >
         {/* Global loading */}
         {loading && (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              py: 10,
+            }}
+          >
             <CircularProgress size={24} thickness={2} />
           </Box>
         )}
@@ -466,7 +477,9 @@ export default function AdminPage() {
                     sx={{
                       color: "primary.main",
                       textDecoration: "none",
-                      "&:hover": { textDecoration: "underline" },
+                      "&:hover": {
+                        textDecoration: "underline",
+                      },
                     }}
                   >
                     Google Cloud Console
@@ -506,7 +519,10 @@ export default function AdminPage() {
                             <Button
                               size="small"
                               onClick={() => setShowSecret((s) => !s)}
-                              sx={{ fontSize: "0.7rem", minWidth: "auto" }}
+                              sx={{
+                                fontSize: "0.7rem",
+                                minWidth: "auto",
+                              }}
                             >
                               {showSecret ? "Hide" : "Show"}
                             </Button>
@@ -611,10 +627,18 @@ export default function AdminPage() {
             }}
           >
             <FolderIcon
-              sx={{ fontSize: 18, color: "success.main", opacity: 0.8 }}
+              sx={{
+                fontSize: 18,
+                color: "success.main",
+                opacity: 0.8,
+              }}
             />
             <Typography
-              sx={{ flex: 1, fontSize: "0.82rem", color: "text.secondary" }}
+              sx={{
+                flex: 1,
+                fontSize: "0.82rem",
+                color: "text.secondary",
+              }}
             >
               <Box
                 component="span"
@@ -625,7 +649,10 @@ export default function AdminPage() {
               &nbsp;·&nbsp;{" "}
               <Box
                 component="span"
-                sx={{ fontFamily: "monospace", fontSize: "0.74rem" }}
+                sx={{
+                  fontFamily: "monospace",
+                  fontSize: "0.74rem",
+                }}
               >
                 {driveConfig.rootFolderId}
               </Box>
@@ -731,14 +758,21 @@ export default function AdminPage() {
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography
                         variant="h6"
-                        sx={{ fontSize: "1rem", mb: 0.4, lineHeight: 1.35 }}
+                        sx={{
+                          fontSize: "1rem",
+                          mb: 0.4,
+                          lineHeight: 1.35,
+                        }}
                       >
                         {event.name}
                       </Typography>
                       <Typography
                         variant="body2"
                         color={expired ? "error.main" : "text.secondary"}
-                        sx={{ fontSize: "0.78rem", mb: 0.5 }}
+                        sx={{
+                          fontSize: "0.78rem",
+                          mb: 0.5,
+                        }}
                       >
                         {event.expiresAt
                           ? `${expired ? "Expired" : "Expires"} ${new Date(event.expiresAt).toLocaleString()}`
@@ -769,9 +803,15 @@ export default function AdminPage() {
                             rel="noreferrer"
                             size="small"
                             disabled={expired}
-                            sx={{ color: "text.secondary" }}
+                            sx={{
+                              color: "text.secondary",
+                            }}
                           >
-                            <OpenInNewIcon sx={{ fontSize: 17 }} />
+                            <OpenInNewIcon
+                              sx={{
+                                fontSize: 17,
+                              }}
+                            />
                           </IconButton>
                         </span>
                       </Tooltip>
@@ -782,7 +822,9 @@ export default function AdminPage() {
                           target="_blank"
                           rel="noreferrer"
                           size="small"
-                          sx={{ color: "text.secondary" }}
+                          sx={{
+                            color: "text.secondary",
+                          }}
                         >
                           <FolderOpenIcon sx={{ fontSize: 17 }} />
                         </IconButton>
@@ -793,7 +835,9 @@ export default function AdminPage() {
                           onClick={() => handleDelete(event.id)}
                           sx={{
                             color: "text.secondary",
-                            "&:hover": { color: "error.main" },
+                            "&:hover": {
+                              color: "error.main",
+                            },
                           }}
                         >
                           <DeleteOutlineIcon sx={{ fontSize: 17 }} />
@@ -908,14 +952,21 @@ export default function AdminPage() {
                   component="img"
                   src={qrDialog.qrCodeDataUrl}
                   alt="QR code"
-                  sx={{ width: "100%", maxWidth: 240, display: "block" }}
+                  sx={{
+                    width: "100%",
+                    maxWidth: 240,
+                    display: "block",
+                  }}
                 />
               </Box>
               <Typography
                 variant="body2"
                 color="text.secondary"
                 textAlign="center"
-                sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
+                sx={{
+                  fontFamily: "monospace",
+                  fontSize: "0.75rem",
+                }}
               >
                 {qrDialog.uploadUrl}
               </Typography>

@@ -1,4 +1,10 @@
 import { getPasswordHash, setPasswordHash } from "../lib/db";
+import {
+  createSession,
+  destroySession,
+  getSessionToken,
+  requireAuth,
+} from "../lib/session";
 
 export const authRoutes = {
   "/api/auth/status": {
@@ -36,7 +42,8 @@ export const authRoutes = {
         );
       }
 
-      return Response.json({ ok: true });
+      const sessionToken = createSession();
+      return Response.json({ ok: true, sessionToken });
     },
   },
 
@@ -57,8 +64,11 @@ export const authRoutes = {
 
       const existingHash = getPasswordHash();
 
-      // If a password is already set, verify the current one first
       if (existingHash) {
+        // Password already set — require an active session
+        const authErr = requireAuth(req);
+        if (authErr) return authErr;
+
         if (!currentPassword) {
           return Response.json(
             { error: "Current password is required" },
@@ -76,7 +86,21 @@ export const authRoutes = {
 
       const newHash = await Bun.password.hash(newPassword);
       setPasswordHash(newHash);
-      return Response.json({ ok: true });
+
+      // Auto-issue a session on first-time setup so the user lands on /admin immediately
+      const sessionToken = existingHash ? undefined : createSession();
+      return Response.json({
+        ok: true,
+        ...(sessionToken ? { sessionToken } : {}),
+      });
+    },
+  },
+
+  "/api/auth/logout": {
+    POST: (req: Request): Response => {
+      const token = getSessionToken(req);
+      if (token) destroySession(token);
+      return new Response(null, { status: 204 });
     },
   },
 };
