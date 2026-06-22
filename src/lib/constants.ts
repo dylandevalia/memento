@@ -9,7 +9,7 @@ export const STORAGE_KEYS = {
 
 export const LIMITS = {
   MAX_UPLOAD_SIZE: 2 * 1024 * 1024 * 1024, // 2 GB
-  CONCURRENT_UPLOADS: 5,
+  CONCURRENT_UPLOADS: 3,
   PROGRESS_THROTTLE_MS: 100,
 } as const;
 

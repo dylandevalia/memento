@@ -1,15 +1,16 @@
 import AddIcon from "@mui/icons-material/Add";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import StarIcon from "@mui/icons-material/Star";
 import { Button, ButtonBase, LinearProgress } from "@mui/material";
 import confetti from "canvas-confetti";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUploadHistory } from "@/hooks/useUploadHistory";
 import { api } from "@/lib/api";
 import { LIMITS } from "@/lib/constants";
 import { handleError } from "@/lib/errorHandler";
-import type { UploadFile, UploadResponse } from "@/types";
+import type { UploadFile, UploadResponse, UploadStatus } from "@/types";
 import { getRandomColor } from "@/utils/material3";
 import { GalleryViewer } from "../gallery-viewer";
 import styles from "./styles.module.css";
@@ -19,42 +20,52 @@ interface FileUploadProps {
   handleOpenQr: () => void;
 }
 
+type UploadPhase = "idle" | "uploading" | "complete";
+
 export function FileUpload({ slug, handleOpenQr }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { addRecords } = useUploadHistory(slug);
 
   const [selectedFiles, setSelectedFiles] = useState<UploadFile[]>([]);
-  const [hasUploaded, setHasUploaded] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle");
+
+  const stats = useMemo(() => {
+    const done = selectedFiles.filter((f) => f.status === "done").length;
+    const failed = selectedFiles.filter((f) => f.status === "failed").length;
+    const total = selectedFiles.length;
+    return { done, failed, total };
+  }, [selectedFiles]);
+
+  // Fire confetti once on full success
+  useEffect(() => {
+    if (uploadPhase === "complete" && stats.failed === 0 && stats.done > 0) {
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    }
+  }, [uploadPhase, stats.failed, stats.done]);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files || files.length === 0) return;
-
       const fileArray = Array.from(files);
-
       setSelectedFiles((prev) => {
-        const existingFileNames = new Set(prev.map((f) => f.name));
-        const newFiles = fileArray.filter(
-          (f) => !existingFileNames.has(f.name),
-        );
-        return [
-          ...prev,
-          ...newFiles.map((file) => ({
+        const existingNames = new Set(prev.map((f) => f.name));
+        const newFiles = fileArray
+          .filter((f) => !existingNames.has(f.name))
+          .map((file) => ({
             name: file.name,
             rawFile: file,
             progress: null,
-          })),
-        ];
+            status: "idle" as UploadStatus,
+          }));
+        return [...prev, ...newFiles];
       });
-
-      // Reset the input so the same file can be selected again if needed
       e.target.value = "";
     },
     [],
   );
 
-  const handleFileDelete = useCallback(async (fileName: string) => {
+  const handleFileDelete = useCallback((fileName: string) => {
     setSelectedFiles((prev) => prev.filter((f) => f.name !== fileName));
   }, []);
 
@@ -63,17 +74,23 @@ export function FileUpload({ slug, handleOpenQr }: FileUploadProps) {
     [selectedFiles],
   );
 
-  const uploadFile = useCallback(
-    async (uploadFile: UploadFile): Promise<UploadResponse | null> => {
+  const uploadSingleFile = useCallback(
+    async (file: UploadFile): Promise<UploadResponse | null> => {
+      setSelectedFiles((prev) =>
+        prev.map((f) =>
+          f.name === file.name
+            ? { ...f, status: "uploading" as UploadStatus }
+            : f,
+        ),
+      );
       try {
         let lastUpdate = 0;
         const res = await api.upload.uploadFileWithProgress(
           slug,
-          uploadFile.rawFile,
+          file.rawFile,
           (loaded, total) => {
             const progressValue = Math.round((loaded / total) * 99);
             const now = Date.now();
-            // Throttle progress updates
             if (
               now - lastUpdate > LIMITS.PROGRESS_THROTTLE_MS ||
               progressValue === 99
@@ -81,85 +98,136 @@ export function FileUpload({ slug, handleOpenQr }: FileUploadProps) {
               lastUpdate = now;
               setSelectedFiles((prev) =>
                 prev.map((f) =>
-                  f.name === uploadFile.name
-                    ? { ...f, progress: progressValue }
-                    : f,
+                  f.name === file.name ? { ...f, progress: progressValue } : f,
                 ),
               );
             }
           },
         );
-
         setSelectedFiles((prev) =>
           prev.map((f) =>
-            f.name === uploadFile.name ? { ...f, progress: 100 } : f,
+            f.name === file.name
+              ? {
+                  ...f,
+                  status: "done" as UploadStatus,
+                  progress: 100,
+                  driveId: res.files[0]?.driveId,
+                }
+              : f,
           ),
         );
-
         return res;
       } catch (error) {
-        handleError(error, `FileUpload:uploadFile:${uploadFile.rawFile.name}`);
+        handleError(error, `FileUpload:upload:${file.name}`);
+        setSelectedFiles((prev) =>
+          prev.map((f) =>
+            f.name === file.name
+              ? {
+                  ...f,
+                  status: "failed" as UploadStatus,
+                  error: (error as Error).message,
+                }
+              : f,
+          ),
+        );
         return null;
       }
     },
     [slug],
   );
 
-  const uploadFiles = useCallback(async () => {
-    if (!selectedFiles || selectedFiles.length === 0) return;
+  const runQueue = useCallback(
+    async (queue: UploadFile[]): Promise<UploadResponse[]> => {
+      if (queue.length === 0) return [];
 
-    setHasUploaded(false);
+      // Mark all queued files as 'queued' in the UI
+      setSelectedFiles((prev) =>
+        prev.map((f) =>
+          queue.some((qf) => qf.name === f.name)
+            ? { ...f, status: "queued" as UploadStatus }
+            : f,
+        ),
+      );
 
-    const queue = [...selectedFiles];
-    const activeUploads: Promise<UploadResponse | null>[] = [];
-    const uploadResults: UploadResponse[] = [];
+      const remaining = [...queue];
+      const active: Promise<UploadResponse | null>[] = [];
+      const results: UploadResponse[] = [];
 
-    while (queue.length > 0 || activeUploads.length > 0) {
-      // Fill up to concurrent limit
-      while (
-        activeUploads.length < LIMITS.CONCURRENT_UPLOADS &&
-        queue.length > 0
-      ) {
-        const file = queue.shift();
-        if (file) {
-          const uploadPromise = uploadFile(file).then((result) => {
-            const index = activeUploads.indexOf(uploadPromise);
-            if (index > -1) activeUploads.splice(index, 1);
-            if (result) uploadResults.push(result);
-            return result;
-          });
-          activeUploads.push(uploadPromise);
+      while (remaining.length > 0 || active.length > 0) {
+        while (
+          active.length < LIMITS.CONCURRENT_UPLOADS &&
+          remaining.length > 0
+        ) {
+          const file = remaining.shift()!;
+          const p: Promise<UploadResponse | null> = uploadSingleFile(file).then(
+            (result) => {
+              const idx = active.indexOf(p);
+              if (idx > -1) active.splice(idx, 1);
+              if (result) results.push(result);
+              return result;
+            },
+          );
+          active.push(p);
         }
+        if (active.length > 0) await Promise.race(active);
       }
 
-      // Wait for at least one upload to complete
-      if (activeUploads.length > 0) {
-        await Promise.race(activeUploads);
-      }
-    }
+      return results;
+    },
+    [uploadSingleFile],
+  );
 
-    // Build history records from upload results
-    const historyRecords = uploadResults.flatMap((result) =>
-      result.files.map((file) => ({
-        name: file.name,
-        driveId: file.driveId,
+  const uploadFiles = useCallback(async () => {
+    const toUpload = selectedFiles.filter((f) => f.status === "idle");
+    if (toUpload.length === 0) return;
+
+    setUploadPhase("uploading");
+    const results = await runQueue(toUpload);
+
+    const historyRecords = results.flatMap((r) =>
+      r.files.map((f) => ({
+        name: f.name,
+        driveId: f.driveId,
         uploadedAt: new Date().toISOString(),
       })),
     );
+    if (historyRecords.length > 0) addRecords(historyRecords);
 
+    setUploadPhase("complete");
+  }, [selectedFiles, runQueue, addRecords]);
+
+  const retryFailed = useCallback(async () => {
+    const failed = selectedFiles.filter((f) => f.status === "failed");
+    if (failed.length === 0) return;
+
+    setUploadPhase("uploading");
+    const results = await runQueue(failed);
+
+    const historyRecords = results.flatMap((r) =>
+      r.files.map((f) => ({
+        name: f.name,
+        driveId: f.driveId,
+        uploadedAt: new Date().toISOString(),
+      })),
+    );
+    if (historyRecords.length > 0) addRecords(historyRecords);
+
+    setUploadPhase("complete");
+  }, [selectedFiles, runQueue, addRecords]);
+
+  const handlePreserveMore = useCallback(() => {
     setSelectedFiles([]);
-    addRecords(historyRecords);
-    setHasUploaded(true);
-  }, [selectedFiles, uploadFile, addRecords]);
+    setUploadPhase("idle");
+  }, []);
 
-  /* Render */
-
+  /* Colours — stable across renders */
   const iconColor = useMemo(() => getRandomColor(700), []);
   const addMoreBtnColor = useMemo(() => getRandomColor(700), []);
   const progressBarColor = useMemo(() => getRandomColor(700), []);
   const shareBtnColor = useMemo(() => getRandomColor(700), []);
+  const retryBtnColor = useMemo(() => getRandomColor(700), []);
 
-  function renderNoSelectedFiles() {
+  function renderDropZone() {
     return (
       <ButtonBase
         component="button"
@@ -180,94 +248,166 @@ export function FileUpload({ slug, handleOpenQr }: FileUploadProps) {
     );
   }
 
-  function renderFileList() {
-    const countMessage = `${selectedFiles.length} ${
-      selectedFiles.length === 1 ? "memory" : "memories"
-    } ready`;
+  function renderFileQueue() {
+    const isUploading = uploadPhase === "uploading";
+    const isComplete = uploadPhase === "complete";
+
+    let headerText: string;
+    if (isUploading) {
+      headerText = `${stats.done} / ${stats.total} preserved`;
+    } else if (isComplete) {
+      headerText =
+        stats.failed > 0
+          ? `${stats.done} preserved · ${stats.failed} failed`
+          : `${stats.done} ${stats.done === 1 ? "memory" : "memories"} preserved!`;
+    } else {
+      headerText = `${selectedFiles.length} ${selectedFiles.length === 1 ? "memory" : "memories"} ready`;
+    }
 
     return (
       <div className={styles.galleryContent}>
         <div className={styles.galleryHeader}>
           <div className={styles.uploadInfo}>
-            <p>{countMessage}</p>
-            <Button
-              type="button"
-              size="small"
-              startIcon={<AddIcon />}
-              style={{ color: addMoreBtnColor }}
-              onClick={() => inputRef.current?.click()}
-            >
-              add more
-            </Button>
+            <p>{headerText}</p>
+            {!isUploading && !isComplete && (
+              <Button
+                type="button"
+                size="small"
+                startIcon={<AddIcon />}
+                style={{ color: addMoreBtnColor }}
+                onClick={() => inputRef.current?.click()}
+              >
+                add more
+              </Button>
+            )}
           </div>
 
-          <div className={styles.fileSizeInfo}>
-            <div>
-              <span>{(fileSize / (1024 * 1024)).toFixed(2)} MB</span>
-              <span>2 GB max</span>
+          {!isUploading && !isComplete && (
+            <div className={styles.fileSizeInfo}>
+              <div>
+                <span>{(fileSize / (1024 * 1024)).toFixed(2)} MB</span>
+                <span>2 GB max</span>
+              </div>
+              <LinearProgress
+                variant="determinate"
+                value={(fileSize / (2 * 1024 * 1024 * 1024)) * 100}
+                sx={{
+                  width: "100%",
+                  height: 4,
+                  backgroundColor: "rgb(var(--mui-grey-200) / 20%)",
+                  "& .MuiLinearProgress-bar": {
+                    background: progressBarColor,
+                  },
+                }}
+              />
             </div>
+          )}
+
+          {isUploading && (
             <LinearProgress
               variant="determinate"
-              value={(fileSize / (2 * 1024 * 1024 * 1024)) * 100}
+              value={stats.total > 0 ? (stats.done / stats.total) * 100 : 0}
               sx={{
                 width: "100%",
-                height: 4,
+                height: 6,
+                borderRadius: 3,
                 backgroundColor: "rgb(var(--mui-grey-200) / 20%)",
                 "& .MuiLinearProgress-bar": {
                   background: progressBarColor,
+                  borderRadius: 3,
                 },
               }}
             />
-          </div>
+          )}
         </div>
 
-        <GalleryViewer files={selectedFiles} onFileDelete={handleFileDelete} />
+        <GalleryViewer
+          files={selectedFiles}
+          onFileDelete={
+            !isUploading && !isComplete ? handleFileDelete : undefined
+          }
+        />
 
-        <Button
-          variant="contained"
-          type="button"
-          onClick={() => uploadFiles()}
-          startIcon={<StarIcon />}
-          endIcon={<StarIcon />}
-          className={styles.shareButton}
-          sx={{
-            color: "white",
-            background: shareBtnColor,
-          }}
-        >
-          preserve memories
-        </Button>
+        {!isUploading && !isComplete && (
+          <Button
+            variant="contained"
+            type="button"
+            onClick={() => uploadFiles()}
+            startIcon={<StarIcon />}
+            endIcon={<StarIcon />}
+            className={styles.shareButton}
+            sx={{ color: "white", background: shareBtnColor }}
+          >
+            preserve memories
+          </Button>
+        )}
+
+        {isComplete && (
+          <div className={styles.completeActions}>
+            {stats.failed > 0 && (
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={retryFailed}
+                style={{
+                  color: retryBtnColor,
+                  borderColor: retryBtnColor,
+                }}
+              >
+                retry {stats.failed} failed
+              </Button>
+            )}
+            <Button
+              variant="outlined"
+              onClick={handlePreserveMore}
+              style={{
+                color: addMoreBtnColor,
+                borderColor: addMoreBtnColor,
+              }}
+            >
+              preserve more
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<QrCode2Icon />}
+              onClick={() => handleOpenQr()}
+              style={{
+                color: shareBtnColor,
+                borderColor: shareBtnColor,
+              }}
+            >
+              share
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
 
-  function renderUploaded() {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
-
+  function renderSuccess() {
     return (
       <div className={styles.uploaded}>
         <h2>memories preserved!</h2>
         <p>thanks for contributing your memories to the celebration</p>
-
         <div>
           <Button
             variant="outlined"
-            // startIcon={<AddIcon />}
-            onClick={() => setHasUploaded(false)}
-            style={{ color: addMoreBtnColor, borderColor: addMoreBtnColor }}
+            onClick={handlePreserveMore}
+            style={{
+              color: addMoreBtnColor,
+              borderColor: addMoreBtnColor,
+            }}
           >
             preserve more
           </Button>
-
           <Button
             variant="outlined"
             startIcon={<QrCode2Icon />}
             onClick={() => handleOpenQr()}
-            style={{ color: shareBtnColor, borderColor: shareBtnColor }}
+            style={{
+              color: shareBtnColor,
+              borderColor: shareBtnColor,
+            }}
             sx={{ ml: 2 }}
           >
             share
@@ -278,15 +418,13 @@ export function FileUpload({ slug, handleOpenQr }: FileUploadProps) {
   }
 
   function renderContent() {
-    if (hasUploaded) {
-      return renderUploaded();
+    if (uploadPhase === "complete" && stats.failed === 0 && stats.done > 0) {
+      return renderSuccess();
     }
-
-    if (selectedFiles.length) {
-      return renderFileList();
+    if (selectedFiles.length > 0 || uploadPhase !== "idle") {
+      return renderFileQueue();
     }
-
-    return renderNoSelectedFiles();
+    return renderDropZone();
   }
 
   return (

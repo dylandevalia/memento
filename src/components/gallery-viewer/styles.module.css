@@ -1,16 +1,22 @@
 .galleryViewer {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 0.25rem;
   width: 100%;
   border-radius: 2rem;
   overflow: hidden;
+  max-height: 300px;
+  overflow-y: auto;
 
   .thumbnailWrapper {
     position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+
+    &.wrapperDeleting {
+      pointer-events: none;
+    }
   }
 
   .thumbnail {
@@ -25,6 +31,10 @@
       opacity: 0;
     }
 
+    &.queued {
+      opacity: 0.5;
+    }
+
     &.uploading {
       will-change: transform;
       animation: shake 0.5s linear infinite;
@@ -35,10 +45,42 @@
       animation: faded 300ms ease-out forwards;
     }
 
+    &.failed {
+      opacity: 0.6;
+      filter: grayscale(60%);
+    }
+
     &.deleting {
       will-change: transform, opacity;
       animation: eraseOut 300ms ease-out forwards;
     }
+  }
+
+  .statusOverlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    pointer-events: none;
+
+    .statusIcon {
+      font-size: 1.25rem;
+      color: white;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+    }
+  }
+
+  .doneOverlay {
+    background-color: rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+  }
+
+  .failedOverlay {
+    background-color: rgba(180, 0, 0, 0.35);
+    cursor: pointer;
+    pointer-events: all;
   }
 
   .deleteButton {

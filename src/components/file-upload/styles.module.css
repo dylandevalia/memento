@@ -120,6 +120,14 @@
       }
     }
 
+    .completeActions {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+
     .shareButton svg {
       will-change: transform;
       animation:

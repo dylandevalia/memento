@@ -1,9 +1,12 @@
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ClearIcon from "@mui/icons-material/Clear";
-import { IconButton, Skeleton } from "@mui/material";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
+import { CircularProgress, IconButton, Skeleton, Tooltip } from "@mui/material";
 import clsx from "clsx";
 import { useCallback, useState } from "react";
 import { TIMEOUTS } from "@/lib/constants";
-import type { GalleryFile } from "@/types";
+import type { GalleryFile, UploadFile } from "@/types";
 import { useFileUrls } from "./hooks/useFileUrls";
 import styles from "./styles.module.css";
 import { playCloudPuff } from "./utils/particleAnimation";
@@ -11,6 +14,10 @@ import { playCloudPuff } from "./utils/particleAnimation";
 interface GalleryViewerProps {
   files: GalleryFile[];
   onFileDelete?: (fileName: string) => void;
+}
+
+function isUploadFile(file: GalleryFile): file is UploadFile {
+  return "rawFile" in file;
 }
 
 export function GalleryViewer({ files, onFileDelete }: GalleryViewerProps) {
@@ -47,12 +54,23 @@ export function GalleryViewer({ files, onFileDelete }: GalleryViewerProps) {
   return (
     <div className={styles.galleryViewer}>
       {files.map((file) => {
-        const progress = "progress" in file ? file.progress : undefined;
-        const hasDelete = progress === null && onFileDelete;
+        const progress =
+          "progress" in file ? (file.progress ?? undefined) : undefined;
+        const uploadFile = isUploadFile(file) ? file : null;
+        const status = uploadFile?.status;
+        const error = uploadFile?.error;
+
+        const canDelete = status === "idle" && !!onFileDelete;
         const isLoaded = loadedImages.has(file.name);
 
         return (
-          <div key={file.name} className={styles.thumbnailWrapper}>
+          <div
+            key={file.name}
+            className={clsx(
+              styles.thumbnailWrapper,
+              filesDeleting.has(file.name) && styles.wrapperDeleting,
+            )}
+          >
             {!isLoaded && (
               <Skeleton
                 variant="rectangular"
@@ -74,15 +92,56 @@ export function GalleryViewer({ files, onFileDelete }: GalleryViewerProps) {
               className={clsx(
                 styles.thumbnail,
                 !isLoaded && styles.loading,
-                progress !== null &&
+                status === "uploading" && styles.uploading,
+                status === "done" && styles.uploaded,
+                status === "failed" && styles.failed,
+                status === "queued" && styles.queued,
+                // Fallback for UploadRecord items (no status)
+                !status &&
                   progress !== undefined &&
                   progress < 100 &&
                   styles.uploading,
-                progress === 100 && styles.uploaded,
+                !status && progress === 100 && styles.uploaded,
                 filesDeleting.has(file.name) && styles.deleting,
               )}
             />
-            {hasDelete && (
+
+            {/* Status overlays */}
+            {status === "queued" && (
+              <div className={styles.statusOverlay}>
+                <HourglassEmptyIcon className={styles.statusIcon} />
+              </div>
+            )}
+            {status === "uploading" && (
+              <div className={styles.statusOverlay}>
+                <CircularProgress
+                  size={24}
+                  variant={
+                    progress !== null && progress !== undefined
+                      ? "determinate"
+                      : "indeterminate"
+                  }
+                  value={progress ?? undefined}
+                  sx={{ color: "white" }}
+                />
+              </div>
+            )}
+            {status === "done" && (
+              <div className={clsx(styles.statusOverlay, styles.doneOverlay)}>
+                <CheckCircleOutlineIcon className={styles.statusIcon} />
+              </div>
+            )}
+            {status === "failed" && (
+              <Tooltip title={error ?? "Upload failed"} placement="top">
+                <div
+                  className={clsx(styles.statusOverlay, styles.failedOverlay)}
+                >
+                  <ErrorOutlineIcon className={styles.statusIcon} />
+                </div>
+              </Tooltip>
+            )}
+
+            {canDelete && (
               <IconButton
                 size="small"
                 className={styles.deleteButton}

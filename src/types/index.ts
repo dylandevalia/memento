@@ -53,10 +53,15 @@ export interface UploadResponse {
   files: { name: string; driveId: string }[];
 }
 
+export type UploadStatus = "idle" | "queued" | "uploading" | "done" | "failed";
+
 export interface UploadFile {
   name: string;
   rawFile: File;
   progress: number | null;
+  status: UploadStatus;
+  error?: string;
+  driveId?: string;
 }
 
 export interface UploadRecord {
