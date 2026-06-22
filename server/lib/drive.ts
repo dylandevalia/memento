@@ -120,7 +120,7 @@ export async function uploadFileToDrive(
       requestBody: fileMetadata,
       media: {
         mimeType,
-        body: Readable.from(buffer),
+        body: Readable.from([buffer]),
       },
       fields: "id",
     });

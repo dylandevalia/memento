@@ -7,17 +7,69 @@ import {
   rateLimitResponse,
 } from "../lib/rateLimit";
 
+/** Upload at most this many files to Drive in parallel within a single batch request. */
+const DRIVE_UPLOAD_CONCURRENCY = 5;
+
+/**
+ * Upload a batch of files to Drive with a bounded concurrency limit.
+ * Returns arrays of succeeded and failed items.
+ */
+async function uploadBatch(
+  files: File[],
+  driveFolderId: string,
+  uploaderName: string | null,
+): Promise<{
+  uploaded: { name: string; driveId: string }[];
+  failed: { name: string; error: string }[];
+}> {
+  const uploaded: { name: string; driveId: string }[] = [];
+  const failed: { name: string; error: string }[] = [];
+
+  const queue = [...files];
+  const active: Promise<void>[] = [];
+
+  const processFile = async (file: File) => {
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const driveId = await uploadFileToDrive(
+        file.name,
+        file.type || "application/octet-stream",
+        buffer,
+        driveFolderId,
+        uploaderName || undefined,
+      );
+      uploaded.push({ name: file.name, driveId });
+    } catch (err) {
+      failed.push({ name: file.name, error: (err as Error).message });
+    }
+  };
+
+  while (queue.length > 0 || active.length > 0) {
+    while (active.length < DRIVE_UPLOAD_CONCURRENCY && queue.length > 0) {
+      const file = queue.shift()!;
+      const p: Promise<void> = processFile(file).then(() => {
+        const idx = active.indexOf(p);
+        if (idx > -1) active.splice(idx, 1);
+      });
+      active.push(p);
+    }
+    if (active.length > 0) await Promise.race(active);
+  }
+
+  return { uploaded, failed };
+}
+
 export const uploadRoutes = {
   "/api/upload/:slug": {
     async POST(
       req: Request & { params: Record<string, string> },
     ): Promise<Response> {
-      // Rate limiting: 50 uploads per minute per IP
+      // Rate limiting: 300 uploads per minute per IP
       const clientIp = getClientIp(req);
       console.log(`[Upload] Client IP: ${clientIp}`);
 
       try {
-        const rateLimit = checkRateLimit(`upload:${clientIp}`, 50, 60000);
+        const rateLimit = checkRateLimit(`upload:${clientIp}`, 300, 60000);
         console.log(`[Upload] Rate limit check:`, rateLimit);
 
         if (!rateLimit.allowed) {
@@ -74,29 +126,19 @@ export const uploadRoutes = {
         );
       }
 
-      const uploaded: { name: string; driveId: string }[] = [];
-      const failed: { name: string; error: string }[] = [];
+      const validFiles = files.filter(
+        (f) => f.type.startsWith("image/") || f.type.startsWith("video/"),
+      );
 
-      for (const file of files) {
-        try {
-          const buffer = Buffer.from(await file.arrayBuffer());
-          const driveId = await uploadFileToDrive(
-            file.name,
-            file.type || "application/octet-stream",
-            buffer,
-            event.driveFolderId,
-            uploaderName || undefined,
-          );
-          uploaded.push({ name: file.name, driveId });
+      const { uploaded, failed } = await uploadBatch(
+        validFiles,
+        event.driveFolderId,
+        uploaderName,
+      );
 
-          // Record the upload in the database
-          recordUpload(event.id, driveId, file.name, uploaderName);
-        } catch (err) {
-          failed.push({
-            name: file.name,
-            error: (err as Error).message,
-          });
-        }
+      // Record successful uploads in the database
+      for (const file of uploaded) {
+        recordUpload(event.id, file.driveId, file.name, uploaderName);
       }
 
       if (uploaded.length === 0) {
@@ -111,6 +153,7 @@ export const uploadRoutes = {
       const body: UploadResponse = {
         uploaded: uploaded.length,
         files: uploaded,
+        ...(failed.length > 0 && { failed }),
       };
       return Response.json(body, { status: 201 });
     },
