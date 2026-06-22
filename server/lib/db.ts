@@ -31,7 +31,15 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_uploads_event_id ON uploads(event_id);
   CREATE INDEX IF NOT EXISTS idx_uploads_drive_id ON uploads(drive_id);
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    token      TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
+
+// Purge sessions older than 90 days on every startup.
+db.exec("DELETE FROM sessions WHERE created_at < datetime('now', '-90 days')");
 
 // Migration: make expires_at nullable if the column was created with NOT NULL
 // and add slug column if missing (backfill with token value for existing rows)
@@ -156,4 +164,24 @@ export function getPasswordHash(): string | null {
 
 export function setPasswordHash(hash: string): void {
   setConfig("admin_password_hash", hash);
+}
+
+export function insertSession(token: string): void {
+  db.prepare("INSERT INTO sessions (token) VALUES ($token)").run({
+    $token: token,
+  });
+}
+
+export function deleteSession(token: string): void {
+  db.prepare("DELETE FROM sessions WHERE token = $token").run({
+    $token: token,
+  });
+}
+
+export function hasSession(token: string): boolean {
+  return Boolean(
+    db
+      .prepare("SELECT 1 FROM sessions WHERE token = $token")
+      .get({ $token: token }),
+  );
 }

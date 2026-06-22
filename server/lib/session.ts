@@ -1,14 +1,18 @@
-/** In-memory session store for the admin portal. */
-const sessions = new Set<string>();
+import { deleteSession, hasSession, insertSession } from "./db";
+
+/**
+ * SQLite-backed session store for the admin portal.
+ * Sessions survive server restarts and are purged after 90 days of inactivity.
+ */
 
 export function createSession(): string {
   const token = crypto.randomUUID();
-  sessions.add(token);
+  insertSession(token);
   return token;
 }
 
 export function destroySession(token: string): void {
-  sessions.delete(token);
+  deleteSession(token);
 }
 
 export function getSessionToken(req: Request): string | null {
@@ -20,7 +24,7 @@ export function getSessionToken(req: Request): string | null {
 /** Returns a 401 Response if the request carries no valid session, otherwise null. */
 export function requireAuth(req: Request): Response | null {
   const token = getSessionToken(req);
-  if (!token || !sessions.has(token)) {
+  if (!token || !hasSession(token)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   return null;
