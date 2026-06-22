@@ -164,6 +164,117 @@ export const uploadRoutes = {
   },
 
   /**
+   * PUT /api/upload/:slug/stream
+   * Headers: Content-Type, Content-Length, X-File-Name, X-Uploader-Name (opt)
+   * Body: raw file bytes
+   *
+   * Thin streaming proxy: creates a Drive resumable upload session, then
+   * pipes req.body straight through to Drive without buffering the file in
+   * server memory. Returns UploadResponse once Drive confirms the write.
+   *
+   * This avoids the CORS restriction that prevents browsers from reading
+   * Drive upload responses directly, while still keeping the actual byte
+   * transfer as a single hop (client XHR progress events fire against the
+   * real transfer to our server, which immediately forwards to Drive).
+   */
+  "/api/upload/:slug/stream": {
+    async PUT(
+      req: Request & { params: Record<string, string> },
+    ): Promise<Response> {
+      const { slug } = req.params;
+      if (!slug)
+        return Response.json({ error: "Missing slug" }, { status: 400 });
+
+      const event = getEventBySlug(slug);
+      if (!event)
+        return Response.json({ error: "Event not found" }, { status: 404 });
+      if (event.expiresAt !== null && new Date(event.expiresAt) < new Date())
+        return Response.json(
+          { error: "This upload link has expired" },
+          { status: 410 },
+        );
+
+      const clientIp = getClientIp(req);
+      try {
+        const rateLimit = checkRateLimit(`upload:${clientIp}`, 300, 60000);
+        if (!rateLimit.allowed) return rateLimitResponse(rateLimit.resetTime);
+      } catch {
+        // Continue if rate-limit check itself errors
+      }
+
+      // File metadata comes from request headers, not multipart
+      const mimeType =
+        req.headers.get("Content-Type") || "application/octet-stream";
+      const rawName = req.headers.get("X-File-Name");
+      const fileName = rawName ? decodeURIComponent(rawName) : "upload";
+      const fileSize = parseInt(req.headers.get("Content-Length") || "0", 10);
+      const uploaderName = req.headers.get("X-Uploader-Name") || null;
+
+      if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/"))
+        return Response.json(
+          { error: "Only photos and videos are allowed" },
+          { status: 415 },
+        );
+
+      if (!req.body)
+        return Response.json(
+          { error: "Request body is empty" },
+          { status: 400 },
+        );
+
+      try {
+        // Create a Drive resumable session. The client has already started
+        // sending bytes; they sit in the OS TCP buffer until we forward them.
+        const uploadUri = await createResumableUploadSession(
+          fileName,
+          mimeType,
+          fileSize,
+          event.driveFolderId,
+          uploaderName ?? undefined,
+        );
+
+        // Pipe req.body straight to Drive — no arrayBuffer(), no buffering.
+        const driveRes = await fetch(uploadUri, {
+          method: "PUT",
+          // @ts-expect-error duplex is required for streaming bodies in some
+          // fetch implementations; Bun supports it but typedefs may omit it.
+          duplex: "half",
+          headers: {
+            "Content-Type": mimeType,
+            ...(fileSize > 0 && {
+              "Content-Length": String(fileSize),
+            }),
+          },
+          body: req.body,
+        });
+
+        if (!driveRes.ok) {
+          const txt = await driveRes.text();
+          throw new Error(
+            `Drive rejected the upload: ${driveRes.status} ${txt}`,
+          );
+        }
+
+        const driveData = (await driveRes.json()) as { id?: string };
+        if (!driveData.id) throw new Error("Drive did not return a file ID");
+
+        recordUpload(event.id, driveData.id, fileName, uploaderName);
+
+        const body: UploadResponse = {
+          uploaded: 1,
+          files: [{ name: fileName, driveId: driveData.id }],
+        };
+        return Response.json(body, { status: 201 });
+      } catch (err) {
+        return Response.json(
+          { error: (err as Error).message },
+          { status: 502 },
+        );
+      }
+    },
+  },
+
+  /**
    * POST /api/upload/:slug/session
    * Body: { fileName, mimeType, fileSize, uploaderName? }
    *

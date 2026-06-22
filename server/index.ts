@@ -13,8 +13,9 @@ const distDir = path.join(import.meta.dir, "../dist");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": isDev ? "http://localhost:3000" : "*",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-File-Name, X-Uploader-Name",
 };
 
 function withCors(res: Response): Response {
@@ -155,6 +156,20 @@ const server = serve({
       if (method === "POST")
         return withCors(
           await uploadRoutes["/api/upload/:slug"].POST(
+            addParams(req, { slug }),
+          ),
+        );
+    }
+
+    // ── Streaming upload route (must precede fileDeleteMatch) ──────────
+    const uploadStreamMatch = pathname.match(
+      /^\/api\/upload\/([^/]+)\/stream$/,
+    );
+    if (uploadStreamMatch) {
+      const slug = uploadStreamMatch[1] ?? "";
+      if (method === "PUT")
+        return withCors(
+          await uploadRoutes["/api/upload/:slug/stream"].PUT(
             addParams(req, { slug }),
           ),
         );
