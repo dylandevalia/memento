@@ -123,31 +123,89 @@ export const api = {
       return res.json() as Promise<UploadResponse>;
     },
 
-    uploadFileWithProgress: (
+    /**
+     * Upload a single file directly to Google Drive, bypassing the server
+     * as a data proxy. Three steps:
+     *   1. POST /api/upload/:slug/session  — server creates a Drive resumable
+     *      upload session and returns the pre-authenticated upload URI.
+     *   2. PUT {uploadUri}               — browser sends bytes straight to
+     *      Drive; XHR upload events give real progress on the actual transfer.
+     *   3. POST /api/upload/:slug/confirm — server records the driveId in DB.
+     */
+    uploadFileWithProgress: async (
       slug: string,
       file: File,
       onProgress: (loaded: number, total: number) => void,
-    ): Promise<UploadResponse> =>
-      new Promise((resolve, reject) => {
-        const form = new FormData();
-        form.append("files", file);
+    ): Promise<UploadResponse> => {
+      // Step 1: obtain a pre-authenticated Drive resumable upload URI
+      const sessionRes = await fetch(`/api/upload/${slug}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          fileSize: file.size,
+        }),
+      });
+      if (!sessionRes.ok) {
+        const err = await sessionRes
+          .json()
+          .catch(() => ({ error: sessionRes.statusText }));
+        throw new Error(
+          (err as { error?: string }).error ?? sessionRes.statusText,
+        );
+      }
+      const { uploadUri } = (await sessionRes.json()) as {
+        uploadUri: string;
+      };
+
+      // Step 2: PUT the file directly to Drive (XHR so upload events fire)
+      const driveId = await new Promise<string>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) onProgress(e.loaded, e.total);
         };
         xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(JSON.parse(xhr.responseText) as UploadResponse);
-          } else {
-            const err = JSON.parse(xhr.responseText) as {
-              error?: string;
+          if (xhr.status === 200 || xhr.status === 201) {
+            const data = JSON.parse(xhr.responseText) as {
+              id?: string;
             };
-            reject(new Error(err.error ?? xhr.statusText));
+            if (data.id) {
+              resolve(data.id);
+            } else {
+              reject(new Error("Drive did not return a file ID"));
+            }
+          } else {
+            reject(new Error(`Drive upload failed (${xhr.status})`));
           }
         };
-        xhr.onerror = () => reject(new Error("Network error"));
-        xhr.open("POST", `/api/upload/${slug}`);
-        xhr.send(form);
-      }),
+        xhr.onerror = () =>
+          reject(new Error("Network error during Drive upload"));
+        xhr.open("PUT", uploadUri);
+        xhr.setRequestHeader(
+          "Content-Type",
+          file.type || "application/octet-stream",
+        );
+        xhr.send(file);
+      });
+
+      // Step 3: confirm with server so the upload is recorded in the DB
+      try {
+        await fetch(`/api/upload/${slug}/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ driveId, fileName: file.name }),
+        });
+      } catch {
+        // Non-fatal: the file is on Drive even if the DB write fails.
+        // The admin can see it directly in Drive; it just won't appear
+        // in the in-app history until the record is recovered.
+        console.warn(
+          "[upload] confirm call failed; file is on Drive but not recorded in DB",
+        );
+      }
+
+      return { uploaded: 1, files: [{ name: file.name, driveId }] };
+    },
   },
 };

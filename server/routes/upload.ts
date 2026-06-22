@@ -1,6 +1,10 @@
 import type { UploadResponse } from "../../src/types";
 import { getEventBySlug, recordUpload } from "../lib/db";
-import { moveFileToBin, uploadFileToDrive } from "../lib/drive";
+import {
+  createResumableUploadSession,
+  moveFileToBin,
+  uploadFileToDrive,
+} from "../lib/drive";
 import {
   checkRateLimit,
   getClientIp,
@@ -156,6 +160,137 @@ export const uploadRoutes = {
         ...(failed.length > 0 && { failed }),
       };
       return Response.json(body, { status: 201 });
+    },
+  },
+
+  /**
+   * POST /api/upload/:slug/session
+   * Body: { fileName, mimeType, fileSize, uploaderName? }
+   *
+   * Validates the event and creates a Drive resumable upload session.
+   * Returns { uploadUri } — a pre-authenticated URL the client can PUT
+   * the file bytes to directly, bypassing the server entirely.
+   */
+  "/api/upload/:slug/session": {
+    async POST(
+      req: Request & { params: Record<string, string> },
+    ): Promise<Response> {
+      const { slug } = req.params;
+      if (!slug)
+        return Response.json({ error: "Missing slug" }, { status: 400 });
+
+      const event = getEventBySlug(slug);
+      if (!event)
+        return Response.json({ error: "Event not found" }, { status: 404 });
+      if (event.expiresAt !== null && new Date(event.expiresAt) < new Date())
+        return Response.json(
+          { error: "This upload link has expired" },
+          { status: 410 },
+        );
+
+      // Rate-limit session creation the same as direct uploads
+      const clientIp = getClientIp(req);
+      try {
+        const rateLimit = checkRateLimit(`upload:${clientIp}`, 300, 60000);
+        if (!rateLimit.allowed) return rateLimitResponse(rateLimit.resetTime);
+      } catch {
+        // Continue if rate-limit check itself errors
+      }
+
+      let body: {
+        fileName: string;
+        mimeType: string;
+        fileSize: number;
+        uploaderName?: string;
+      };
+      try {
+        body = await req.json();
+      } catch {
+        return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+      }
+
+      const { fileName, mimeType, fileSize, uploaderName } = body;
+      if (!fileName || !mimeType || !fileSize) {
+        return Response.json(
+          {
+            error: "Missing required fields: fileName, mimeType, fileSize",
+          },
+          { status: 400 },
+        );
+      }
+      if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) {
+        return Response.json(
+          { error: "Only photos and videos are allowed" },
+          { status: 415 },
+        );
+      }
+
+      try {
+        const uploadUri = await createResumableUploadSession(
+          fileName,
+          mimeType,
+          fileSize,
+          event.driveFolderId,
+          uploaderName,
+        );
+        return Response.json({ uploadUri });
+      } catch (err) {
+        return Response.json(
+          { error: (err as Error).message },
+          { status: 502 },
+        );
+      }
+    },
+  },
+
+  /**
+   * POST /api/upload/:slug/confirm
+   * Body: { driveId, fileName, uploaderName? }
+   *
+   * Called by the client after a successful direct Drive upload to record
+   * the upload in the database. Not rate-limited — it is a lightweight DB
+   * write and the file is already on Drive by this point.
+   */
+  "/api/upload/:slug/confirm": {
+    async POST(
+      req: Request & { params: Record<string, string> },
+    ): Promise<Response> {
+      const { slug } = req.params;
+      if (!slug)
+        return Response.json({ error: "Missing slug" }, { status: 400 });
+
+      const event = getEventBySlug(slug);
+      if (!event)
+        return Response.json({ error: "Event not found" }, { status: 404 });
+
+      let body: {
+        driveId: string;
+        fileName: string;
+        uploaderName?: string;
+      };
+      try {
+        body = await req.json();
+      } catch {
+        return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+      }
+
+      const { driveId, fileName, uploaderName } = body;
+      if (!driveId || !fileName) {
+        return Response.json(
+          { error: "Missing required fields: driveId, fileName" },
+          { status: 400 },
+        );
+      }
+
+      try {
+        recordUpload(event.id, driveId, fileName, uploaderName ?? null);
+        return Response.json({ driveId }, { status: 201 });
+      } catch (err) {
+        return Response.json(
+          { error: (err as Error).message },
+          { status: 502 },
+        );
+      }
     },
   },
 

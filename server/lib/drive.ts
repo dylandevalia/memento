@@ -222,6 +222,85 @@ export async function getThumbnailData(
 }
 
 /**
+ * Initiate a Drive resumable upload session and return the upload URI.
+ *
+ * The returned URI is pre-authenticated — the client can PUT the raw file
+ * bytes directly to it with no additional Authorization header. The URI
+ * is valid for 7 days (Google's limit for resumable upload sessions).
+ *
+ * Flow: server calls this → returns URI to client → client PUTs file to
+ * Drive directly → Drive responds with { id } → client confirms with server.
+ */
+export async function createResumableUploadSession(
+  fileName: string,
+  mimeType: string,
+  fileSize: number,
+  folderId: string,
+  uploaderName?: string,
+): Promise<string> {
+  const clientId = getConfig("googleClientId");
+  const clientSecret = getConfig("googleClientSecret");
+  const refreshToken = getConfig("googleRefreshToken");
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error(
+      "Google Drive is not connected. Please complete the Google setup in the Admin panel.",
+    );
+  }
+
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, "postmessage");
+  oauth2.setCredentials({ refresh_token: refreshToken });
+
+  const { token } = await oauth2.getAccessToken();
+  if (!token) throw new Error("Failed to obtain Google access token.");
+
+  const metadata: Record<string, unknown> = {
+    name: fileName,
+    parents: [folderId],
+  };
+  if (uploaderName) {
+    metadata.properties = { uploaderName };
+  }
+
+  // Initiate the resumable session. The Location header in the response is
+  // the upload URI the client will PUT to directly.
+  const res = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "X-Upload-Content-Type": mimeType,
+        "X-Upload-Content-Length": String(fileSize),
+      },
+      body: JSON.stringify(metadata),
+    },
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    if (body.includes("invalid_grant")) {
+      throw new Error(
+        "Google authentication expired. Please reconnect Google Drive in the Admin panel.",
+      );
+    }
+    throw new Error(
+      `Failed to initiate Drive upload session: ${res.status} ${body}`,
+    );
+  }
+
+  const uploadUri = res.headers.get("Location");
+  if (!uploadUri) {
+    throw new Error(
+      "Drive did not return an upload URI in the Location header.",
+    );
+  }
+
+  return uploadUri;
+}
+
+/**
  * Move a file into a `_deleted` sub-folder inside the given parent folder.
  * The sub-folder is created on first use.
  */

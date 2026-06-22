@@ -160,6 +160,33 @@ const server = serve({
         );
     }
 
+    // ── Upload session + confirm routes (must precede fileDeleteMatch) ──
+    const uploadSessionMatch = pathname.match(
+      /^\/api\/upload\/([^/]+)\/session$/,
+    );
+    if (uploadSessionMatch) {
+      const slug = uploadSessionMatch[1] ?? "";
+      if (method === "POST")
+        return withCors(
+          await uploadRoutes["/api/upload/:slug/session"].POST(
+            addParams(req, { slug }),
+          ),
+        );
+    }
+
+    const uploadConfirmMatch = pathname.match(
+      /^\/api\/upload\/([^/]+)\/confirm$/,
+    );
+    if (uploadConfirmMatch) {
+      const slug = uploadConfirmMatch[1] ?? "";
+      if (method === "POST")
+        return withCors(
+          await uploadRoutes["/api/upload/:slug/confirm"].POST(
+            addParams(req, { slug }),
+          ),
+        );
+    }
+
     // ── File delete routes ────────────────────────────────────────────
     const fileDeleteMatch = pathname.match(/^\/api\/upload\/([^/]+)\/([^/]+)$/);
     if (fileDeleteMatch) {
