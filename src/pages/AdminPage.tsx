@@ -190,6 +190,7 @@ export default function AdminPage() {
   });
   const [savingFolder, setSavingFolder] = useState(false);
   const [folderError, setFolderError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   // Create-event form state
   const [name, setName] = useState("");
@@ -274,6 +275,30 @@ export default function AdminPage() {
       setCredsError((err as Error).message);
     } finally {
       setSavingCreds(false);
+    }
+  }
+
+  async function handleDisconnect() {
+    if (
+      !window.confirm(
+        "Disconnect Google Drive? This clears all credentials and the linked folder. Existing events are not affected.",
+      )
+    )
+      return;
+    setDisconnecting(true);
+    setError(null);
+    try {
+      await api.config.disconnect();
+      setGoogleCreds({ clientId: null, apiKey: null, connected: false });
+      setDriveConfig({ rootFolderId: null, rootFolderName: null });
+      setSetupClientId("");
+      setSetupClientSecret("");
+      setSetupApiKey("");
+      setEditingCreds(false);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDisconnecting(false);
     }
   }
 
@@ -664,6 +689,15 @@ export default function AdminPage() {
               sx={{ flexShrink: 0, fontSize: "0.72rem" }}
             >
               Change
+            </Button>
+            <Button
+              size="small"
+              color="error"
+              disabled={disconnecting}
+              onClick={handleDisconnect}
+              sx={{ flexShrink: 0, fontSize: "0.72rem" }}
+            >
+              {disconnecting ? "Disconnecting…" : "Disconnect"}
             </Button>
           </Box>
         )}

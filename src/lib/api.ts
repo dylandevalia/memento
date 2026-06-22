@@ -80,6 +80,8 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ folderId, folderName }),
       }),
+
+    disconnect: () => request<void>("/config/google", { method: "DELETE" }),
   },
 
   events: {

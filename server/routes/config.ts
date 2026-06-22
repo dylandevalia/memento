@@ -24,9 +24,27 @@ export const configRoutes = {
       return Response.json(body);
     },
 
+    /**
+     * Wipe all Google credentials and the Drive folder config.
+     * After this the app returns to the initial setup flow.
+     */
+    async DELETE(_req: Request): Promise<Response> {
+      setConfig("googleClientId", "");
+      setConfig("googleClientSecret", "");
+      setConfig("googleApiKey", "");
+      setConfig("googleRefreshToken", "");
+      setConfig("rootFolderId", "");
+      setConfig("rootFolderName", "");
+      return new Response(null, { status: 204 });
+    },
+
     /** Save Client ID, Client Secret (server-side only), and API Key. */
     async POST(req: Request): Promise<Response> {
-      let body: { clientId: string; clientSecret: string; apiKey: string };
+      let body: {
+        clientId: string;
+        clientSecret: string;
+        apiKey: string;
+      };
       try {
         body = (await req.json()) as typeof body;
       } catch {
@@ -38,7 +56,9 @@ export const configRoutes = {
         !body.apiKey?.trim()
       ) {
         return Response.json(
-          { error: "clientId, clientSecret, and apiKey are required" },
+          {
+            error: "clientId, clientSecret, and apiKey are required",
+          },
           { status: 400 },
         );
       }
@@ -88,7 +108,10 @@ export const configRoutes = {
     async POST(req: Request): Promise<Response> {
       let body: { folderId: string; folderName: string };
       try {
-        body = (await req.json()) as { folderId: string; folderName: string };
+        body = (await req.json()) as {
+          folderId: string;
+          folderName: string;
+        };
       } catch {
         return Response.json({ error: "Invalid JSON body" }, { status: 400 });
       }

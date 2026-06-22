@@ -82,6 +82,11 @@ const server = serve({
         if (authErr) return withCors(authErr);
         return withCors(await configRoutes["/api/config/google"].POST(req));
       }
+      if (method === "DELETE") {
+        const authErr = requireAuth(req);
+        if (authErr) return withCors(authErr);
+        return withCors(await configRoutes["/api/config/google"].DELETE(req));
+      }
     }
 
     if (pathname === "/api/config/google-auth") {
